@@ -93,6 +93,39 @@ npm run build && npx wrangler pages dev dist --port 8788
 `npm run dev` (Vite en 5173) proxya `/api` a 8788, así que para trabajar en la UI conviene tener
 los dos procesos. Typecheck: `npx tsc --noEmit`.
 
+## Control de versiones
+
+Repositorio **privado** en `github.com/rubencerroo/cample`, rama `main`.
+
+**Nada se despliega sin estar antes en git.** El orden de cada cambio es:
+
+```bash
+git add -A && git commit -m "..." && git push
+```
+
+y solo después `npm run deploy`. Si el cambio toca `schema.sql`, la migración remota va entre
+medias (antes del deploy). Así siempre se puede volver a la versión anterior, que es justo lo que
+faltaba: la app ya la usa la familia con datos reales.
+
+⚠️ **`.dev.vars` y `secrets.local.txt` están en `.gitignore` y NO deben subirse nunca.** Los
+peppers no se pueden recuperar de Cloudflare. Antes de un `git add -A` a lo bruto, comprobar:
+
+```bash
+git check-ignore -v .dev.vars secrets.local.txt
+```
+
+### Por qué el deploy no es automático desde git
+
+El proyecto de Pages `cample` se creó por **subida directa** (`wrangler pages deploy`), no
+conectado a un repositorio, y Cloudflare no permite convertir uno en otro. Conectarlo a git
+exigiría crear un proyecto nuevo: cambiaría el subdominio (`cample.pages.dev` lo ocupa el actual,
+y es la dirección que ya tiene la familia) y habría que rehacer el binding de D1 y volver a subir
+los dos secretos. No compensa.
+
+Si algún día se quiere «hago push y se despliega solo» **sin perder la URL**, la vía es un workflow
+de GitHub Actions con `cloudflare/wrangler-action` apuntando a este mismo proyecto; hace falta
+crear un API token de Cloudflare y guardarlo como secreto del repositorio. Propuesto, no hecho.
+
 ## Despliegue
 
 Ya hecho: proyecto Pages `cample`, D1 `cample-db` (`database_id` en `wrangler.toml`), esquema
