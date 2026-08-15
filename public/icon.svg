@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Cample">
+  <defs>
+    <linearGradient id="fondo" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512">
+      <stop offset="0" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#6d28d9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fondo con esquinas de icono. El dibujo cabe en la zona segura de un icono «maskable». -->
+  <rect width="512" height="512" rx="112" fill="url(#fondo)"/>
+
+  <!-- Caja y tapa -->
+  <rect x="136" y="240" width="240" height="152" rx="20" fill="#fff"/>
+  <rect x="120" y="188" width="272" height="68" rx="24" fill="#fff"/>
+
+  <!-- La cinta atraviesa caja y tapa. Es un hueco: se pinta con el mismo fondo. -->
+  <rect x="234" y="188" width="44" height="204" fill="url(#fondo)"/>
+
+  <!-- Lazo: dos bucles simétricos y el nudo, por encima de la cinta. -->
+  <g fill="#fff">
+    <path d="M256 188C244 138 188 106 158 134c-28 26 34 56 98 54Z"/>
+    <path d="M256 188c12-50 68-82 98-54 28 26-34 56-98 54Z"/>
+    <circle cx="256" cy="190" r="23"/>
+  </g>
+</svg>

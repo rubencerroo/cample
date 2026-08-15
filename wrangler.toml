@@ -1,0 +1,17 @@
+name = "cample"
+compatibility_date = "2024-12-01"
+pages_build_output_dir = "dist"
+
+[vars]
+# Estos usuarios se marcan como administradores automáticamente al registrarse.
+ADMIN_USERNAMES = "rubencerroo"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cample-db"
+database_id = "114f0689-9a48-4ff7-a050-efa1a5a61dbb"
+
+# Secretos (NO se ponen aquí):
+#   npx wrangler pages secret put DNI_PEPPER
+#   npx wrangler pages secret put SESSION_PEPPER
+# En local usa .dev.vars
