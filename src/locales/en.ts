@@ -5,6 +5,8 @@ export const en: Dict = {
   'common.save': 'Save',
   'common.cancel': 'Cancel',
   'common.close': 'Close',
+  'common.ok': 'Got it',
+  'common.problem': 'That did not work',
   'common.remove': 'Remove',
   'common.delete': 'Delete',
   'common.back': 'Back',
@@ -15,6 +17,11 @@ export const en: Dict = {
   'common.people': 'people',
   'common.person': 'person',
   'common.you': 'you',
+  'common.and': 'and',
+
+  'react.likedBy': '{who} like this',
+  'react.andMore': '{who} and {n} more',
+  'react.aria': 'React with {emoji}',
 
   'nav.home': 'Home',
   'nav.myList': 'My list',
@@ -93,6 +100,12 @@ export const en: Dict = {
   'myList.emptyHint': 'Press "Add" and write the first thing that comes to mind.',
   'myList.shareUser': 'Share your username: {user}',
   'myList.confirmDelete': 'Delete "{title}"?',
+  'myList.views.none': 'Nobody has looked at your list this month yet.',
+  'myList.views.few': 'Someone has looked at your list this month.',
+  'myList.views.some': 'Several people have looked at your list this month.',
+  'myList.views.many': 'Quite a few people have looked at your list this month.',
+  'myList.compare': 'You have {mine} things listed; your friends have around {avg} each.',
+  'myList.compareNone': 'Your list is empty. Write down the first thing that comes to mind, however small.',
 
   'gift.sharedFallback': 'Present',
   'gift.newTitle': 'New present',
@@ -101,6 +114,11 @@ export const en: Dict = {
   'gift.notes': 'Details (optional)',
   'gift.notesPlaceholder': 'Size, colour, brand, where to buy it… or "any one will do"',
   'gift.url': 'Link (optional)',
+  'gift.paste': 'Paste',
+  'gift.fillFromLink': '✨ Fill it in from the link',
+  'gift.reading': 'Reading the page…',
+  'gift.clipboardEmpty': 'No link copied. Copy the address and try again.',
+  'gift.photoFromLink': 'Photo taken from the link',
   'gift.price': 'Approx. price (€)',
   'gift.quantity': 'How many?',
   'gift.quantityHint':
@@ -131,6 +149,11 @@ export const en: Dict = {
 
   'friendList.notice':
     'If you reserve a present, {name} finds out nothing. Everyone else only sees that it is taken, not by whom.',
+  'friendList.reactionNotice':
+    'If you tap a heart, {name} will see it: it is a way of saying you like what they asked for.',
+  'friendList.nudgeText': '{name} has not listed many ideas. You can ask them to add more.',
+  'friendList.nudgeButton': 'Ask them to add something',
+  'friendList.nudgeSent': 'Message sent ✅',
   'friendList.birthdayToday': ' · today!',
   'friendList.birthdayTomorrow': ' · tomorrow!',
   'friendList.birthdayIn': ' · {n} days to go',

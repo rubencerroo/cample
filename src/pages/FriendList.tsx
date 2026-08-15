@@ -5,20 +5,26 @@ import {
   Avatar,
   Empty,
   ErrorBox,
+  Reacciones,
   Spinner,
   VisibilityChip,
   birthdayLabel,
   daysUntilBirthday,
   money,
   useAsync,
+  useDialogos,
 } from '../ui'
 import { useT } from '../i18n'
 
 export default function FriendList() {
   const t = useT()
   const { username = '' } = useParams()
+  const { avisar } = useDialogos()
   const list = useAsync(() => api.list(username), [username])
   const [grouping, setGrouping] = useState<Gift | null>(null)
+
+  /** Los fallos al reservar se cuentan en una ventana propia, no en la del navegador. */
+  const fallo = (e: Error) => avisar(t('common.problem'), e.message)
 
   if (list.loading) return <Spinner />
   if (list.error) return <ErrorBox>{list.error}</ErrorBox>
@@ -55,6 +61,13 @@ export default function FriendList() {
       <p className="rounded-2xl bg-brand-50 border border-brand-200 px-4 py-3 text-sm text-brand-900">
         {t('friendList.notice', { name: user.displayName.split(' ')[0] })}
       </p>
+
+      {/* Una reacción NO es una reserva y sí la ve el dueño: hay que decirlo antes, no después. */}
+      <p className="text-sm text-slate-500">
+        {t('friendList.reactionNotice', { name: user.displayName.split(' ')[0] })}
+      </p>
+
+      {pending.length < 3 && <Toque user={user} />}
 
       {pending.length === 0 ? (
         <Empty title={t('friendList.nothingPending')} />
@@ -122,7 +135,7 @@ export default function FriendList() {
                           {g.quantity > 1 && (
                             <Unidades
                               gift={g}
-                              onChange={(n) => api.reserve(g.id, n).then(list.reload).catch((e) => alert(e.message))}
+                              onChange={(n) => api.reserve(g.id, n).then(list.reload).catch(fallo)}
                             />
                           )}
                           <button className="btn-ghost !py-2 !px-4 !text-sm" onClick={() => api.unreserve(g.id).then(list.reload)}>
@@ -135,7 +148,7 @@ export default function FriendList() {
                             {g.quantity > 1 && free && (
                               <Unidades
                                 gift={g}
-                                onChange={(n) => api.reserve(g.id, n).then(list.reload).catch((e) => alert(e.message))}
+                                onChange={(n) => api.reserve(g.id, n).then(list.reload).catch(fallo)}
                                 soloElegir
                               />
                             )}
@@ -143,7 +156,7 @@ export default function FriendList() {
                               <button
                                 className="btn-primary !py-2 !px-4 !text-sm"
                                 disabled={!free}
-                                onClick={() => api.reserve(g.id).then(list.reload).catch((e) => alert(e.message))}
+                                onClick={() => api.reserve(g.id).then(list.reload).catch(fallo)}
                               >
                                 {free ? t('friendList.iGiveIt') : t('friendList.alreadyTaken')}
                               </button>
@@ -157,6 +170,16 @@ export default function FriendList() {
                         </button>
                       )}
                     </div>
+
+                    <Reacciones
+                      reactions={g.reactions}
+                      mine={g.myReaction}
+                      onPick={(emoji) =>
+                        (emoji ? api.react(g.id, emoji) : api.unreact(g.id))
+                          .then(list.reload)
+                          .catch(fallo)
+                      }
+                    />
                   </div>
                 </div>
               </li>
@@ -179,6 +202,41 @@ export default function FriendList() {
           </ul>
         </details>
       )}
+    </div>
+  )
+}
+
+/**
+ * «Pídele que apunte algo». Cuando alguien tiene la lista vacía no hay nada que hacer con ella,
+ * y quedarse callado es lo que mata la app: esto le manda un aviso claro, pedido por una persona.
+ * No insinúa nada sobre reservas —solo dice que un amigo quiere acertar— así que no toca la regla 1.
+ */
+function Toque({ user }: { user: { username: string; displayName: string } }) {
+  const t = useT()
+  const [estado, setEstado] = useState<'' | 'enviado' | string>('')
+
+  return (
+    <div className="card flex flex-wrap items-center gap-3 border-dashed">
+      <span className="text-2xl" aria-hidden>💡</span>
+      <p className="min-w-40 flex-1 text-sm text-slate-600">
+        {t('friendList.nudgeText', { name: user.displayName.split(' ')[0] })}
+      </p>
+      {estado === 'enviado' ? (
+        <span className="chip bg-green-100 text-green-700">{t('friendList.nudgeSent')}</span>
+      ) : (
+        <button
+          className="btn-ghost !py-2 !px-4 !text-sm"
+          onClick={() =>
+            api
+              .nudge(user.username)
+              .then(() => setEstado('enviado'))
+              .catch((e) => setEstado(e.message))
+          }
+        >
+          {t('friendList.nudgeButton')}
+        </button>
+      )}
+      {estado && estado !== 'enviado' && <p className="w-full text-sm text-slate-500">{estado}</p>}
     </div>
   )
 }

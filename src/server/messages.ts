@@ -15,6 +15,17 @@ const EN: Record<string, string> = {
   'El DNI o NIE no es válido. Revísalo (número + letra)':
     'That ID number is not valid. Check it (numbers + letter)',
   'El código no es correcto o ha caducado': 'That code is wrong or has expired',
+  'Esa reacción no vale': 'That reaction is not allowed',
+  'Ese enlace no vale. Copia la dirección de la página del producto.':
+    'That link will not do. Copy the address of the product page.',
+  'Has probado con muchos enlaces seguidos. Prueba dentro de un rato.':
+    'You have tried many links in a row. Try again in a while.',
+  'No he podido leer esa página. Escríbelo a mano.':
+    'I could not read that page. Please type it in yourself.',
+  'No puedes darte un toque a ti mismo': 'You cannot nudge yourself',
+  'No puedes reaccionar a tus propios regalos': 'You cannot react to your own presents',
+  'Ya le has dado un toque hace poco. Espera unos días.':
+    'You nudged them recently. Wait a few days.',
   'El enlace debe empezar por http:// o https://': 'The link must start with http:// or https://',
   'El nombre no puede estar vacío': 'Your name cannot be empty',
   'El usuario debe tener 3-20 letras, números, punto o guion bajo':
@@ -74,6 +85,17 @@ const FR: Record<string, string> = {
   'El DNI o NIE no es válido. Revísalo (número + letra)':
     "Ce numéro de pièce d'identité n'est pas valide. Vérifie-le (chiffres + lettre)",
   'El código no es correcto o ha caducado': "Ce code est incorrect ou a expiré",
+  'Esa reacción no vale': "Cette réaction n'est pas autorisée",
+  'Ese enlace no vale. Copia la dirección de la página del producto.':
+    'Ce lien ne convient pas. Copie l’adresse de la page du produit.',
+  'Has probado con muchos enlaces seguidos. Prueba dentro de un rato.':
+    'Tu as essayé beaucoup de liens à la suite. Réessaie dans un moment.',
+  'No he podido leer esa página. Escríbelo a mano.':
+    "Je n'ai pas pu lire cette page. Écris-le à la main.",
+  'No puedes darte un toque a ti mismo': 'Tu ne peux pas te relancer toi-même',
+  'No puedes reaccionar a tus propios regalos': 'Tu ne peux pas réagir à tes propres cadeaux',
+  'Ya le has dado un toque hace poco. Espera unos días.':
+    'Tu l’as déjà relancé récemment. Attends quelques jours.',
   'El enlace debe empezar por http:// o https://': 'Le lien doit commencer par http:// ou https://',
   'El nombre no puede estar vacío': 'Le nom ne peut pas être vide',
   'El usuario debe tener 3-20 letras, números, punto o guion bajo':

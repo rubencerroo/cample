@@ -6,6 +6,8 @@ export const es = {
   'common.save': 'Guardar',
   'common.cancel': 'Cancelar',
   'common.close': 'Cerrar',
+  'common.ok': 'Entendido',
+  'common.problem': 'No se ha podido',
   'common.remove': 'Quitar',
   'common.delete': 'Borrar',
   'common.back': 'Volver',
@@ -16,6 +18,11 @@ export const es = {
   'common.people': 'personas',
   'common.person': 'persona',
   'common.you': 'tú',
+  'common.and': 'y',
+
+  'react.likedBy': 'Les gusta a {who}',
+  'react.andMore': '{who} y {n} más',
+  'react.aria': 'Reaccionar con {emoji}',
 
   'nav.home': 'Inicio',
   'nav.myList': 'Mi lista',
@@ -94,6 +101,12 @@ export const es = {
   'myList.emptyHint': 'Pulsa «Añadir» y escribe lo primero que te apetezca.',
   'myList.shareUser': 'Comparte tu usuario: {user}',
   'myList.confirmDelete': '¿Eliminar «{title}»?',
+  'myList.views.none': 'Este mes todavía no ha entrado nadie a ver tu lista.',
+  'myList.views.few': 'Este mes alguien ha entrado a ver tu lista.',
+  'myList.views.some': 'Este mes han mirado tu lista varias personas.',
+  'myList.views.many': 'Este mes ha mirado tu lista bastante gente.',
+  'myList.compare': 'Tienes {mine} cosas apuntadas; tus amigos tienen unas {avg} cada uno.',
+  'myList.compareNone': 'Tu lista está vacía. Apunta lo primero que se te ocurra, aunque sea una tontería.',
 
   'gift.sharedFallback': 'Regalo',
   'gift.newTitle': 'Nuevo regalo',
@@ -102,6 +115,11 @@ export const es = {
   'gift.notes': 'Detalles (opcional)',
   'gift.notesPlaceholder': 'Talla, color, marca, dónde comprarlo… o «me vale cualquiera»',
   'gift.url': 'Enlace (opcional)',
+  'gift.paste': 'Pegar',
+  'gift.fillFromLink': '✨ Rellenar solo desde el enlace',
+  'gift.reading': 'Leyendo la página…',
+  'gift.clipboardEmpty': 'No hay ningún enlace copiado. Copia la dirección y vuelve a probar.',
+  'gift.photoFromLink': 'Foto sacada del enlace',
   'gift.price': 'Precio aprox. (€)',
   'gift.quantity': '¿Cuántas quieres?',
   'gift.quantityHint':
@@ -132,6 +150,11 @@ export const es = {
 
   'friendList.notice':
     'Si reservas un regalo, {name} no se entera de nada. Los demás solo verán que está cogido, sin saber por quién.',
+  'friendList.reactionNotice':
+    'Si pulsas un corazón, {name} lo verá: sirve para decirle que te gusta lo que ha pedido.',
+  'friendList.nudgeText': 'A {name} le faltan ideas apuntadas. Puedes pedirle que añada más.',
+  'friendList.nudgeButton': 'Pedirle que apunte algo',
+  'friendList.nudgeSent': 'Aviso enviado ✅',
   'friendList.birthdayToday': ' · ¡es hoy!',
   'friendList.birthdayTomorrow': ' · ¡mañana!',
   'friendList.birthdayIn': ' · faltan {n} días',

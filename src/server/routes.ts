@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { randomId, sha256, hmac, hashPassword, verifyPassword, timingSafeEqual } from './crypto'
 import { normalizePhone } from './phone'
+import { normalizeUrl, unfurl } from './unfurl'
 import { translateError } from './messages'
 import { normalizeDocument } from './dni'
 
@@ -545,6 +546,8 @@ app.delete('/admin/users/:username', auth, adminOnly, async (c) => {
   await c.env.DB.batch([
     c.env.DB.prepare('DELETE FROM reservations WHERE reserver_id = ?1 OR gift_id IN (SELECT id FROM gifts WHERE user_id = ?1)').bind(target.id),
     c.env.DB.prepare('DELETE FROM gift_audience WHERE user_id = ?1 OR gift_id IN (SELECT id FROM gifts WHERE user_id = ?1)').bind(target.id),
+    c.env.DB.prepare('DELETE FROM gift_reactions WHERE user_id = ?1 OR gift_id IN (SELECT id FROM gifts WHERE user_id = ?1)').bind(target.id),
+    c.env.DB.prepare('DELETE FROM list_views WHERE owner_id = ?1 OR viewer_id = ?1').bind(target.id),
     c.env.DB.prepare('DELETE FROM gifts WHERE user_id = ?').bind(target.id),
     c.env.DB.prepare('DELETE FROM feedback WHERE user_id = ?').bind(target.id),
     c.env.DB.prepare('DELETE FROM friendships WHERE user_a = ?1 OR user_b = ?1').bind(target.id),
@@ -923,6 +926,11 @@ app.delete('/friends/:username', auth, async (c) => {
     c.env.DB.prepare(
       'DELETE FROM reservations WHERE (reserver_id = ?1 AND gift_id IN (SELECT id FROM gifts WHERE user_id = ?2)) OR (reserver_id = ?2 AND gift_id IN (SELECT id FROM gifts WHERE user_id = ?1))',
     ).bind(me, other.id),
+    // Y las reacciones cruzadas: si ya no sois amigos, no debe quedar rastro de esa persona
+    // en la lista del otro. (A diferencia de `gift_audience`, aquí no hay nada que conservar.)
+    c.env.DB.prepare(
+      'DELETE FROM gift_reactions WHERE (user_id = ?1 AND gift_id IN (SELECT id FROM gifts WHERE user_id = ?2)) OR (user_id = ?2 AND gift_id IN (SELECT id FROM gifts WHERE user_id = ?1))',
+    ).bind(me, other.id),
     // Y se sale de las colectas por regalos de la otra persona.
     c.env.DB.prepare(
       `DELETE FROM group_members WHERE (user_id = ?1 AND group_id IN
@@ -968,6 +976,24 @@ function isHttpUrl(u: string | null) {
     return false
   }
 }
+
+/**
+ * Rellenar un regalo desde un enlace. El deseo no nace dentro de Cample: nace en una tienda, en
+ * un vídeo o en el móvil de otro. Cuanto menos haya que escribir al volver, más cosas se apuntan.
+ * Devuelve una propuesta que la persona ve y puede cambiar antes de guardar; aquí no se escribe
+ * nada en la base.
+ */
+app.get('/unfurl', auth, async (c) => {
+  const url = normalizeUrl(c.req.query('url') ?? '')
+  if (!url) return c.json({ error: 'Ese enlace no vale. Copia la dirección de la página del producto.' }, 400)
+  // El servidor descarga una página por cada llamada: se limita por persona, no por IP.
+  if (!(await rateLimit(c.env, `unfurl:${c.get('userId')}`, 60, 3600)))
+    return c.json({ error: 'Has probado con muchos enlaces seguidos. Prueba dentro de un rato.' }, 429)
+
+  const info = await unfurl(url)
+  if (!info) return c.json({ error: 'No he podido leer esa página. Escríbelo a mano.' }, 422)
+  return c.json({ preview: info })
+})
 
 /* --------------------------- visibilidad por regalo -------------------------
  * Un regalo puede ocultarse a parte del círculo: 'only' lo ven solo las personas de
@@ -1079,6 +1105,94 @@ async function audienceOf(c: Ctx, giftIds: string[]) {
   return out
 }
 
+/* -------------------------------- reacciones ------------------------------ */
+/**
+ * «Qué buena idea». Una reacción por persona y regalo, y el dueño SÍ las ve.
+ *
+ * Esto no rompe la regla 1: una reacción no dice nada de quién va a comprar qué, y es la única
+ * señal alegre que recibe de vuelta quien se molesta en escribir su lista. Sin ella, escribir la
+ * lista es tirar cosas a un pozo: no pasa nada, y por eso nadie vuelve a apuntar nada.
+ *
+ * ⚠️ Lo que sí existe es una fuga por deducción (quien reacciona puede acabar siendo quien
+ * regala). Por eso la interfaz dice claramente que la reacción la ve el dueño: nadie debe
+ * reaccionar creyendo que está haciendo algo privado. No convertir esto nunca en «anónimo»:
+ * una reacción anónima sí se leería como «alguien ha cogido esto».
+ */
+const EMOJIS = ['❤️', '👍', '😍', '🎉']
+
+/** Reacciones de cada regalo, agrupadas. `me` sirve para saber cuál he puesto yo. */
+async function reactionsOf(c: Ctx, giftIds: string[]) {
+  const out: Record<string, { emoji: string; people: { username: string; displayName: string }[] }[]> = {}
+  if (!giftIds.length) return out
+  const { results } = await c.env.DB.prepare(
+    `SELECT r.gift_id, r.emoji, u.username, u.display_name FROM gift_reactions r
+       JOIN users u ON u.id = r.user_id
+      WHERE r.gift_id IN (${giftIds.map(() => '?').join(',')})
+      ORDER BY r.created_at`,
+  )
+    .bind(...giftIds)
+    .all<any>()
+  for (const r of results) {
+    const lista = (out[r.gift_id] ??= [])
+    const grupo = lista.find((x) => x.emoji === r.emoji) ?? (lista.push({ emoji: r.emoji, people: [] }), lista.at(-1)!)
+    grupo.people.push({ username: r.username, displayName: r.display_name })
+  }
+  return out
+}
+
+const reactionPayload = (
+  grupos: { emoji: string; people: { username: string; displayName: string }[] }[] | undefined,
+  meUsername: string,
+) => ({
+  reactions: (grupos ?? []).map((g) => ({ emoji: g.emoji, count: g.people.length, people: g.people })),
+  myReaction: (grupos ?? []).find((g) => g.people.some((p) => p.username === meUsername))?.emoji ?? null,
+})
+
+app.post('/gifts/:id/react', auth, async (c) => {
+  const me = c.get('userId')
+  const g = await c.env.DB.prepare('SELECT * FROM gifts WHERE id = ?').bind(c.req.param('id')!).first<any>()
+  if (!g) return c.json({ error: 'No encontrado' }, 404)
+  if (g.user_id === me) return c.json({ error: 'No puedes reaccionar a tus propios regalos' }, 400)
+  if (!(await areFriends(c.env, me, g.user_id))) return c.json({ error: 'No sois amigos' }, 403)
+  // Un regalo que no ves no existe para ti: 404, nunca 403.
+  if (!(await canSeeGift(c.env, g, me))) return c.json({ error: 'No encontrado' }, 404)
+
+  const b = await c.req.json().catch(() => ({}))
+  // «❤️» y «❤» son el mismo emoji con y sin selector de variación (U+FE0F), y según el teclado
+  // llega uno u otro. Se compara sin él y se guarda siempre la forma de `EMOJIS`, para que no
+  // acaben dos corazones distintos contando por separado.
+  const selector = String.fromCharCode(0xfe0f)
+  const pelado = (s: string) => s.split(selector).join('')
+  const emoji = EMOJIS.find((e) => pelado(e) === pelado(String(b.emoji ?? '')))
+  if (!emoji) return c.json({ error: 'Esa reacción no vale' }, 400)
+
+  const yaTenia = await c.env.DB.prepare('SELECT emoji FROM gift_reactions WHERE gift_id = ? AND user_id = ?')
+    .bind(g.id, me)
+    .first<{ emoji: string }>()
+  await c.env.DB.prepare(
+    'INSERT INTO gift_reactions (gift_id, user_id, emoji, created_at) VALUES (?1, ?2, ?3, ?4) ' +
+      'ON CONFLICT(gift_id, user_id) DO UPDATE SET emoji = ?3',
+  )
+    .bind(g.id, me, emoji, now())
+    .run()
+
+  // Solo se avisa la primera vez: cambiar de emoji no tiene que llenarle los avisos a nadie.
+  if (!yaTenia) {
+    const yo = await c.env.DB.prepare('SELECT display_name FROM users WHERE id = ?').bind(me).first<any>()
+    await notify(c.env, g.user_id, 'reaction', `A ${yo.display_name} le gusta que hayas pedido «${g.title}»`, '/mi-lista')
+  }
+  return c.json({ ok: true })
+})
+
+app.delete('/gifts/:id/react', auth, async (c) => {
+  await c.env.DB.prepare('DELETE FROM gift_reactions WHERE gift_id = ? AND user_id = ?')
+    .bind(c.req.param('id')!, c.get('userId'))
+    .run()
+  return c.json({ ok: true })
+})
+
+/* ----------------------------- mi propia lista ---------------------------- */
+
 app.get('/gifts', auth, async (c) => {
   const { results } = await c.env.DB.prepare(
     'SELECT * FROM gifts WHERE user_id = ? ORDER BY is_received, priority DESC, created_at DESC',
@@ -1086,7 +1200,16 @@ app.get('/gifts', auth, async (c) => {
     .bind(c.get('userId'))
     .all<any>()
   const aud = await audienceOf(c, results.filter((g) => g.visibility !== 'all').map((g) => g.id))
-  return c.json({ gifts: results.map((g) => ({ ...ownerView(g), audience: aud[g.id] ?? [] })) })
+  // Reacciones sí; de `reservations` no se consulta nada aquí, nunca (regla 1).
+  const react = await reactionsOf(c, results.map((g) => g.id))
+  const yo = await c.env.DB.prepare('SELECT username FROM users WHERE id = ?').bind(c.get('userId')).first<any>()
+  return c.json({
+    gifts: results.map((g) => ({
+      ...ownerView(g),
+      audience: aud[g.id] ?? [],
+      ...reactionPayload(react[g.id], yo.username),
+    })),
+  })
 })
 
 app.post('/gifts', auth, async (c) => {
@@ -1229,12 +1352,24 @@ app.get('/lists/:username', auth, async (c) => {
     .bind(me, other.id)
     .all<any>()
 
+  // Queda constancia de que alguien ha pasado por aquí, una fila por persona y día. Solo se usa
+  // para el rango de `GET /me/pulse`; el dueño nunca sabrá quién ni cuándo.
+  await c.env.DB.prepare(
+    'INSERT OR IGNORE INTO list_views (owner_id, viewer_id, day) VALUES (?, ?, ?)',
+  )
+    .bind(other.id, me, Math.floor(now() / 86400))
+    .run()
+
+  const react = await reactionsOf(c, results.map((g) => g.id))
+  const yo = await c.env.DB.prepare('SELECT username FROM users WHERE id = ?').bind(me).first<any>()
+
   return c.json({
     user: publicUser(other),
     gifts: results.map((g) => {
       const taken = g.reserved + (g.group_id ? 1 : 0)
       return {
         ...ownerView(g),
+        ...reactionPayload(react[g.id], yo.username),
         // Cuántas unidades quedan y si la he cogido yo. Nunca decimos quién más.
         taken,
         remaining: Math.max(0, g.quantity - taken),
@@ -1722,6 +1857,75 @@ app.get('/activity', auth, async (c) => {
       user: publicUser({ ...r, id: r.uid }),
     })),
   })
+})
+
+/**
+ * El «pulso» de mi propia lista. Escribir una lista y que no ocurra absolutamente nada es lo que
+ * hace que la gente no vuelva a apuntar nada: la regla 1 deja al dueño a ciegas por diseño, así
+ * que hay que devolverle alguna señal que no destripe nada.
+ *
+ * Lo que se devuelve:
+ *  - `views`: un RANGO ('none' | 'few' | 'some' | 'many') de cuántas personas distintas han
+ *    entrado en mi lista en los últimos 30 días. Nunca el número exacto ni quién, y **nada** si
+ *    tengo menos de 3 amigos: con dos, cualquier cifra señala a alguien concreto.
+ *  - `myGifts` y `friendsAvg`: comparación sana («tus amigos tienen 8 apuntados, tú 2»).
+ *
+ * Aquí no se consulta `reservations` ni `gift_groups`: una visita no es una reserva, y el rango
+ * está justamente para que no se pueda hacer aritmética con él.
+ */
+app.get('/me/pulse', auth, async (c) => {
+  const me = c.get('userId')
+  const desde = Math.floor(now() / 86400) - 30
+  const r = await c.env.DB.prepare(
+    `SELECT
+       (SELECT COUNT(*) FROM friendships WHERE user_a = ?1 OR user_b = ?1) AS amigos,
+       (SELECT COUNT(DISTINCT viewer_id) FROM list_views WHERE owner_id = ?1 AND day >= ?2) AS visitantes,
+       (SELECT COUNT(*) FROM gifts WHERE user_id = ?1 AND is_archived = 0 AND is_received = 0) AS mios,
+       (SELECT COUNT(*) FROM gifts g
+          WHERE g.is_archived = 0 AND g.is_received = 0
+            AND g.user_id IN (SELECT CASE WHEN user_a = ?1 THEN user_b ELSE user_a END
+                                FROM friendships WHERE user_a = ?1 OR user_b = ?1)) AS deAmigos`,
+  )
+    .bind(me, desde)
+    .first<any>()
+
+  const amigos = r?.amigos ?? 0
+  const v = r?.visitantes ?? 0
+  const views = amigos < 3 ? null : v === 0 ? 'none' : v <= 2 ? 'few' : v <= 5 ? 'some' : 'many'
+
+  return c.json({
+    pulse: {
+      friends: amigos,
+      views,
+      myGifts: r?.mios ?? 0,
+      friendsAvg: amigos > 0 ? Math.round((r?.deAmigos ?? 0) / amigos) : 0,
+    },
+  })
+})
+
+/**
+ * «Apunta algo, que no sé qué regalarte». Un empujón explícito de una persona a otra: es la única
+ * forma honesta de pedirle a alguien que llene su lista sin insinuarle nada sobre las reservas.
+ * Como mucho uno por semana y por pareja, para que no se convierta en una lata.
+ */
+app.post('/nudge/:username', auth, async (c) => {
+  const me = c.get('userId')
+  const other = await userByUsername(c, c.req.param('username')!)
+  if (!other) return c.json({ error: 'No existe ese usuario' }, 404)
+  if (other.id === me) return c.json({ error: 'No puedes darte un toque a ti mismo' }, 400)
+  if (!(await areFriends(c.env, me, other.id))) return c.json({ error: 'No sois amigos' }, 403)
+  if (!(await rateLimit(c.env, `nudge:${me}:${other.id}`, 1, 7 * 86400)))
+    return c.json({ error: 'Ya le has dado un toque hace poco. Espera unos días.' }, 429)
+
+  const yo = await c.env.DB.prepare('SELECT display_name FROM users WHERE id = ?').bind(me).first<any>()
+  await notify(
+    c.env,
+    other.id,
+    'nudge',
+    `${yo.display_name} te pide que apuntes algo en tu lista`,
+    '/mi-lista',
+  )
+  return c.json({ ok: true })
 })
 
 // Avisos de cada pestaña. Se calculan del estado real, no de notificaciones marcadas como leídas.

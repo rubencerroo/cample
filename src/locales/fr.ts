@@ -5,6 +5,8 @@ export const fr: Dict = {
   'common.save': 'Enregistrer',
   'common.cancel': 'Annuler',
   'common.close': 'Fermer',
+  'common.ok': 'Compris',
+  'common.problem': 'Ça n’a pas marché',
   'common.remove': 'Retirer',
   'common.delete': 'Supprimer',
   'common.back': 'Retour',
@@ -15,6 +17,11 @@ export const fr: Dict = {
   'common.people': 'personnes',
   'common.person': 'personne',
   'common.you': 'toi',
+  'common.and': 'et',
+
+  'react.likedBy': '{who} aiment ça',
+  'react.andMore': '{who} et {n} autres',
+  'react.aria': 'Réagir avec {emoji}',
 
   'nav.home': 'Accueil',
   'nav.myList': 'Ma liste',
@@ -96,6 +103,13 @@ export const fr: Dict = {
   'myList.emptyHint': "Appuie sur « Ajouter » et écris la première chose qui te vient à l'esprit.",
   'myList.shareUser': "Partage ton nom d'utilisateur : {user}",
   'myList.confirmDelete': 'Supprimer « {title} » ?',
+  'myList.views.none': "Personne n'a encore regardé ta liste ce mois-ci.",
+  'myList.views.few': 'Quelqu’un a regardé ta liste ce mois-ci.',
+  'myList.views.some': 'Plusieurs personnes ont regardé ta liste ce mois-ci.',
+  'myList.views.many': 'Pas mal de monde a regardé ta liste ce mois-ci.',
+  'myList.compare': 'Tu as noté {mine} choses ; tes amis en ont environ {avg} chacun.',
+  'myList.compareNone':
+    'Ta liste est vide. Note la première chose qui te vient, même toute petite.',
 
   'gift.sharedFallback': 'Cadeau',
   'gift.newTitle': 'Nouveau cadeau',
@@ -104,6 +118,11 @@ export const fr: Dict = {
   'gift.notes': 'Détails (facultatif)',
   'gift.notesPlaceholder': 'Taille, couleur, marque, où l\'acheter… ou « n\'importe lequel »',
   'gift.url': 'Lien (facultatif)',
+  'gift.paste': 'Coller',
+  'gift.fillFromLink': '✨ Remplir depuis le lien',
+  'gift.reading': 'Lecture de la page…',
+  'gift.clipboardEmpty': 'Aucun lien copié. Copie l’adresse et réessaie.',
+  'gift.photoFromLink': 'Photo prise sur le lien',
   'gift.price': 'Prix approx. (€)',
   'gift.quantity': 'Combien en veux-tu ?',
   'gift.quantityHint':
@@ -135,6 +154,11 @@ export const fr: Dict = {
 
   'friendList.notice':
     "Si tu réserves un cadeau, {name} n'en saura rien. Les autres verront seulement qu'il est pris, sans savoir par qui.",
+  'friendList.reactionNotice':
+    'Si tu appuies sur un cœur, {name} le verra : c’est une façon de dire que son idée te plaît.',
+  'friendList.nudgeText': '{name} n’a pas noté beaucoup d’idées. Tu peux lui demander d’en ajouter.',
+  'friendList.nudgeButton': 'Lui demander de noter quelque chose',
+  'friendList.nudgeSent': 'Message envoyé ✅',
   'friendList.birthdayToday': " · c'est aujourd'hui !",
   'friendList.birthdayTomorrow': ' · demain !',
   'friendList.birthdayIn': ' · dans {n} jours',

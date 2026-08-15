@@ -41,6 +41,9 @@ export type Gift = {
   audience?: { username: string; displayName: string }[]
   // solo en listas ajenas: cuántas personas señala, nunca quiénes
   audienceCount?: number
+  // Reacciones: las ve todo el que ve el regalo, **incluido el dueño**. No son reservas.
+  reactions?: { emoji: string; count: number; people: { username: string; displayName: string }[] }[]
+  myReaction?: string | null
   taken?: number
   remaining?: number
   reservedByMe?: boolean
@@ -124,6 +127,25 @@ export type Feedback = {
   from: { username: string; displayName: string } | null
 }
 
+/** Lo que se saca de un enlace para prerrellenar un regalo. Todo puede venir vacío. */
+export type Preview = {
+  title: string | null
+  imageUrl: string | null
+  price: number | null
+  siteName: string | null
+}
+
+/**
+ * Señal de vida de mi propia lista. `views` es un rango, nunca un número, y viene `null` si
+ * tengo menos de 3 amigos (con menos, cualquier cifra señalaría a alguien).
+ */
+export type Pulse = {
+  friends: number
+  views: 'none' | 'few' | 'some' | 'many' | null
+  myGifts: number
+  friendsAvg: number
+}
+
 export class ApiError extends Error {}
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -205,6 +227,12 @@ export const api = {
   addFriend: (u: string) => req<{ relation: string }>(`/friends/${u}/request`, { method: 'POST' }),
   acceptFriend: (u: string) => req<{ relation: string }>(`/friends/${u}/accept`, { method: 'POST' }),
   removeFriend: (u: string) => req<{ relation: string }>(`/friends/${u}`, { method: 'DELETE' }),
+
+  unfurl: (url: string) => req<{ preview: Preview }>(`/unfurl?url=${encodeURIComponent(url)}`),
+  pulse: () => req<{ pulse: Pulse }>('/me/pulse'),
+  nudge: (username: string) => req(`/nudge/${username}`, { method: 'POST' }),
+  react: (id: string, emoji: string) => req(`/gifts/${id}/react`, { method: 'POST', ...body({ emoji }) }),
+  unreact: (id: string) => req(`/gifts/${id}/react`, { method: 'DELETE' }),
 
   gifts: () => req<{ gifts: Gift[] }>('/gifts'),
   createGift: (d: Record<string, unknown>) => req<{ gift: Gift }>('/gifts', { method: 'POST', ...body(d) }),

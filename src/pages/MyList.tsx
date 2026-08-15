@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, Gift } from '../api'
-import { Avatar, Empty, ErrorBox, Spinner, VisibilityChip, money, useAsync } from '../ui'
+import { Avatar, Empty, ErrorBox, Reacciones, Spinner, VisibilityChip, money, useAsync, useDialogos } from '../ui'
 import { useAuth } from '../App'
 import { getLang, translate, useT } from '../i18n'
 
@@ -9,6 +9,7 @@ const EMPTY = {
   title: '',
   notes: '',
   url: '',
+  imageUrl: '',
   price: '',
   priority: 1,
   quantity: 1,
@@ -39,6 +40,7 @@ function prefillDesdeCompartir(p: URLSearchParams): Prefill | null {
 export default function MyList() {
   const { user } = useAuth()
   const t = useT()
+  const { confirmar } = useDialogos()
   const list = useAsync(() => api.gifts(), [])
   const [editing, setEditing] = useState<Gift | 'new' | null>(null)
   const [prefill, setPrefill] = useState<Prefill | null>(null)
@@ -68,6 +70,8 @@ export default function MyList() {
         {t('myList.secret')}
       </p>
 
+      <Pulso />
+
       <ErrorBox>{list.error}</ErrorBox>
       {list.loading ? (
         <Spinner />
@@ -96,6 +100,8 @@ export default function MyList() {
                       </a>
                     )}
                   </div>
+                  {/* Quién ha dicho «qué buena idea». Nunca quién lo va a comprar (regla 1). */}
+                  <Reacciones reactions={g.reactions} readOnly />
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       className="btn-ghost !py-2 !px-4 !text-sm"
@@ -108,9 +114,13 @@ export default function MyList() {
                     </button>
                     <button
                       className="btn-danger !py-2 !px-4 !text-sm"
-                      onClick={() => {
-                        if (confirm(t('myList.confirmDelete', { title: g.title })))
-                          api.deleteGift(g.id).then(list.reload)
+                      onClick={async () => {
+                        const ok = await confirmar({
+                          title: t('myList.confirmDelete', { title: g.title }),
+                          confirmLabel: t('common.delete'),
+                          danger: true,
+                        })
+                        if (ok) api.deleteGift(g.id).then(list.reload)
                       }}
                     >
                       {t('common.delete')}
@@ -145,6 +155,36 @@ export default function MyList() {
         {t('myList.shareUser', { user: `@${user.username}` })}
       </p>
     </div>
+  )
+}
+
+/**
+ * Señal de vida de la propia lista. Sin esto, escribir una lista es tirar cosas a un pozo: por la
+ * regla 1 el dueño no ve ninguna reserva, así que si tampoco ve nada más, deja de apuntar cosas.
+ *
+ * Lo que se enseña son rangos y medias, nunca cifras que se puedan cruzar con nadie: «la ha
+ * mirado bastante gente» no dice quién, ni cuándo, ni —sobre todo— si alguien reservó algo.
+ */
+function Pulso() {
+  const t = useT()
+  const p = useAsync(() => api.pulse(), [])
+  const d = p.data?.pulse
+  if (!d || d.friends === 0) return null
+
+  const pocos = d.myGifts < Math.max(3, d.friendsAvg)
+  if (!d.views && !pocos) return null
+
+  return (
+    <section className="card space-y-1 border-brand-200 bg-brand-50">
+      {d.views && <p className="font-semibold text-brand-900">{t(`myList.views.${d.views}`)}</p>}
+      {pocos && (
+        <p className="text-sm text-brand-800">
+          {d.myGifts === 0
+            ? t('myList.compareNone')
+            : t('myList.compare', { mine: d.myGifts, avg: Math.max(1, d.friendsAvg) })}
+        </p>
+      )}
+    </section>
   )
 }
 
@@ -245,6 +285,7 @@ function GiftDialog({
           title: gift.title,
           notes: gift.notes,
           url: gift.url ?? '',
+          imageUrl: gift.imageUrl ?? '',
           price: gift.price === null ? '' : String(gift.price),
           priority: gift.priority,
           quantity: gift.quantity,
@@ -255,7 +296,51 @@ function GiftDialog({
   )
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [leyendo, setLeyendo] = useState(false)
+  const [aviso, setAviso] = useState('')
   const t = useT()
+
+  /**
+   * Rellena el regalo a partir del enlace. Lo que ya esté escrito manda: esto solo completa los
+   * huecos, para que volver a pulsarlo nunca borre lo que la persona haya cambiado a mano.
+   */
+  async function rellenar(url: string, silencioso = false) {
+    if (!url.trim()) return
+    setLeyendo(true)
+    setAviso('')
+    try {
+      const { preview } = await api.unfurl(url)
+      setF((prev) => ({
+        ...prev,
+        title: prev.title || preview.title || '',
+        imageUrl: prev.imageUrl || preview.imageUrl || '',
+        price: prev.price || (preview.price === null ? '' : String(preview.price)),
+      }))
+    } catch (err: any) {
+      // Al llegar desde «Compartir» no se avisa: la persona no ha pedido nada, escribe y ya.
+      if (!silencioso) setAviso(err.message)
+    } finally {
+      setLeyendo(false)
+    }
+  }
+
+  // Enlace que llega desde «Compartir con Cample»: se intenta leer solo, sin que nadie lo pida.
+  useEffect(() => {
+    if (prefill?.url) rellenar(prefill.url, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function pegar() {
+    try {
+      const texto = (await navigator.clipboard.readText()).trim()
+      const url = texto.match(/https?:\/\/\S+/)?.[0]
+      if (!url) return setAviso(t('gift.clipboardEmpty'))
+      setF((prev) => ({ ...prev, url }))
+      await rellenar(url)
+    } catch {
+      setAviso(t('gift.clipboardEmpty'))
+    }
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -266,7 +351,7 @@ function GiftDialog({
         setError(t('gift.pickSomeone'))
         return
       }
-      const payload = { ...f, url: f.url || null }
+      const payload = { ...f, url: f.url || null, imageUrl: f.imageUrl || null }
       if (gift) await api.updateGift(gift.id, payload)
       else await api.createGift(payload)
       onSaved()
@@ -285,9 +370,53 @@ function GiftDialog({
       >
         <h2 className="text-xl font-extrabold">{gift ? t('gift.editTitle') : t('gift.newTitle')}</h2>
 
+        {/* El enlace va primero a propósito: pegarlo rellena el resto y es el camino corto. */}
+        <div>
+          <label className="label" htmlFor="u">{t('gift.url')}</label>
+          <div className="flex gap-2">
+            <input
+              id="u"
+              className="input flex-1"
+              inputMode="url"
+              placeholder="https://…"
+              value={f.url}
+              onChange={(e) => setF({ ...f, url: e.target.value })}
+            />
+            {/* El portapapeles no existe en todos los navegadores; si no está, no se pinta. */}
+            {typeof navigator !== 'undefined' && !!navigator.clipboard && (
+              <button type="button" className="btn-ghost !px-4 shrink-0" onClick={pegar}>
+                {t('gift.paste')}
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            className="btn-ghost mt-2 w-full !py-2 !text-sm"
+            disabled={!f.url.trim() || leyendo}
+            onClick={() => rellenar(f.url)}
+          >
+            {leyendo ? t('gift.reading') : t('gift.fillFromLink')}
+          </button>
+          {aviso && <p className="mt-1 text-sm text-slate-500">{aviso}</p>}
+        </div>
+
+        {f.imageUrl && (
+          <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
+            <img src={f.imageUrl} alt="" className="h-16 w-16 rounded-2xl object-cover" />
+            <span className="flex-1 text-sm text-slate-600">{t('gift.photoFromLink')}</span>
+            <button
+              type="button"
+              className="btn-ghost !py-2 !px-4 !text-sm"
+              onClick={() => setF({ ...f, imageUrl: '' })}
+            >
+              {t('common.remove')}
+            </button>
+          </div>
+        )}
+
         <div>
           <label className="label" htmlFor="t">{t('gift.what')}</label>
-          <input id="t" className="input" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} required autoFocus />
+          <input id="t" className="input" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} required />
         </div>
 
         <div>
@@ -299,11 +428,6 @@ function GiftDialog({
             value={f.notes}
             onChange={(e) => setF({ ...f, notes: e.target.value })}
           />
-        </div>
-
-        <div>
-          <label className="label" htmlFor="u">{t('gift.url')}</label>
-          <input id="u" className="input" inputMode="url" placeholder="https://…" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} />
         </div>
 
         <div className="grid grid-cols-2 gap-3">

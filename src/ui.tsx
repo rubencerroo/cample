@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { getLang, localeOf, translate } from './i18n'
 
 /** Traducción fuera de React, para las funciones sueltas de este fichero. */
@@ -206,6 +206,183 @@ export function VisibilityChip({
     <span className="chip bg-violet-100 text-violet-800" title={tr('visibility.title')}>
       🔒 {text}
     </span>
+  )
+}
+
+/* --------------------- ventanas de confirmar y de avisar ------------------- */
+/**
+ * Sustituye a `confirm()` y `alert()` del navegador. No es cosmética: las ventanas nativas salen
+ * pegadas arriba del navegador en escritorio, con letra pequeña y botones minúsculos, y en algunos
+ * móviles ni se ven bien. Aquí mandan las mismas reglas que en el resto de la app: 17px, botones
+ * de 48px y castellano llano.
+ *
+ * Se usa con `const { confirmar, avisar } = useDialogos()`:
+ *
+ *   if (await confirmar({ title: '¿Borrar «X»?', danger: true, confirmLabel: 'Borrar' })) …
+ *   await avisar('No se ha podido reservar', motivo)
+ */
+type Peticion = {
+  title: string
+  body?: string
+  confirmLabel?: string
+  danger?: boolean
+  /** Solo un botón de «Entendido»: es un aviso, no hay nada que decidir. */
+  soloAviso?: boolean
+}
+
+type Dialogos = {
+  confirmar: (p: Peticion) => Promise<boolean>
+  avisar: (title: string, body?: string) => Promise<boolean>
+}
+
+const DialogosCtx = createContext<Dialogos>(null!)
+export const useDialogos = () => useContext(DialogosCtx)
+
+export function DialogosProvider({ children }: { children: React.ReactNode }) {
+  const [abierto, setAbierto] = useState<(Peticion & { resolver: (v: boolean) => void }) | null>(null)
+  const primero = useRef<HTMLButtonElement>(null)
+
+  const confirmar = useCallback(
+    (p: Peticion) => new Promise<boolean>((resolver) => setAbierto({ ...p, resolver })),
+    [],
+  )
+  const avisar = useCallback(
+    (title: string, body?: string) => confirmar({ title, body, soloAviso: true }),
+    [confirmar],
+  )
+
+  // Cerrar con Escape equivale a cancelar; el foco entra en la opción segura.
+  useEffect(() => {
+    if (!abierto) return
+    primero.current?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      abierto.resolver(false)
+      setAbierto(null)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [abierto])
+
+  const responder = (v: boolean) => {
+    abierto?.resolver(v)
+    setAbierto(null)
+  }
+
+  return (
+    <DialogosCtx.Provider value={{ confirmar, avisar }}>
+      {children}
+      {abierto && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+          onClick={(e) => e.target === e.currentTarget && responder(false)}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="dlg-t"
+            className="w-full max-w-md space-y-4 rounded-t-3xl bg-white p-5 sm:rounded-3xl"
+          >
+            <h2 id="dlg-t" className="text-xl font-extrabold">
+              {abierto.title}
+            </h2>
+            {abierto.body && <p className="whitespace-pre-wrap text-slate-600">{abierto.body}</p>}
+            <div className="flex gap-2 pt-1">
+              {abierto.soloAviso ? (
+                <button ref={primero} className="btn-primary flex-1" onClick={() => responder(true)}>
+                  {tr('common.ok')}
+                </button>
+              ) : (
+                <>
+                  <button ref={primero} className="btn-ghost flex-1" onClick={() => responder(false)}>
+                    {tr('common.cancel')}
+                  </button>
+                  <button
+                    className={`${abierto.danger ? 'btn-danger' : 'btn-primary'} flex-1`}
+                    onClick={() => responder(true)}
+                  >
+                    {abierto.confirmLabel ?? tr('common.ok')}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </DialogosCtx.Provider>
+  )
+}
+
+/* -------------------------------- reacciones ------------------------------ */
+
+/** Los mismos cuatro que acepta el servidor (`EMOJIS` en routes.ts). */
+export const REACTION_EMOJIS = ['❤️', '👍', '😍', '🎉']
+
+type Reaction = { emoji: string; count: number; people: { username: string; displayName: string }[] }
+
+/**
+ * Reacciones de un regalo. En la lista de un amigo se puede pulsar; en la propia solo se leen.
+ *
+ * ⚠️ El aviso de que «lo ve» el dueño es parte de la función, no adorno: nadie debe reaccionar
+ * creyendo que hace algo privado. Y ojo, esto no es una reserva: el texto no debe insinuar
+ * nunca que quien reacciona vaya a comprar nada.
+ */
+export function Reacciones({
+  reactions,
+  mine,
+  onPick,
+  readOnly,
+}: {
+  reactions?: Reaction[]
+  mine?: string | null
+  onPick?: (emoji: string | null) => void
+  readOnly?: boolean
+}) {
+  const lista = reactions ?? []
+  const total = lista.reduce((n, r) => n + r.count, 0)
+  if (readOnly && total === 0) return null
+
+  const nombres = [...new Map(lista.flatMap((r) => r.people).map((p) => [p.username, p])).values()].map(
+    (p) => p.displayName.split(' ')[0],
+  )
+  const unir = (xs: string[]) =>
+    xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} ${tr('common.and')} ${xs.at(-1)}`
+  const quien =
+    nombres.length <= 3
+      ? unir(nombres)
+      : tr('react.andMore', { who: nombres.slice(0, 2).join(', '), n: nombres.length - 2 })
+
+  return (
+    <div className="mt-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {(readOnly ? lista.map((r) => r.emoji) : REACTION_EMOJIS).map((emoji) => {
+          const n = lista.find((r) => r.emoji === emoji)?.count ?? 0
+          const puesta = mine === emoji
+          if (readOnly)
+            return (
+              <span key={emoji} className="chip bg-rose-50 text-rose-800">
+                {emoji} {n}
+              </span>
+            )
+          return (
+            <button
+              key={emoji}
+              type="button"
+              aria-pressed={puesta}
+              aria-label={tr('react.aria', { emoji })}
+              onClick={() => onPick?.(puesta ? null : emoji)}
+              className={`flex h-11 min-w-11 items-center justify-center gap-1 rounded-2xl border px-3 text-lg ${
+                puesta ? 'border-rose-400 bg-rose-50' : 'border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <span aria-hidden>{emoji}</span>
+              {n > 0 && <span className="text-sm font-bold text-slate-600">{n}</span>}
+            </button>
+          )
+        })}
+      </div>
+      {total > 0 && <p className="mt-1 text-sm text-slate-500">{tr('react.likedBy', { who: quien })}</p>}
+    </div>
   )
 }
 

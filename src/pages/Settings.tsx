@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../App'
-import { Avatar, ErrorBox, birthdayLabel, fileToAvatarDataUrl } from '../ui'
+import { Avatar, ErrorBox, birthdayLabel, fileToAvatarDataUrl, useDialogos } from '../ui'
 import { LANGS, useI18n, useT } from '../i18n'
 
 export default function Settings() {
   const { user, setUser, logout, showGuide } = useAuth()
   const { lang, setLang } = useI18n()
   const t = useT()
+  const { confirmar } = useDialogos()
   const [f, setF] = useState({ displayName: user.displayName, bio: user.bio, birthday: user.birthday ?? '' })
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
@@ -208,8 +209,13 @@ export default function Settings() {
                 <button
                   type="button"
                   className="btn-ghost"
-                  onClick={() => {
-                    if (confirm(t('settings.confirmRemovePhone'))) guardarTel('')
+                  onClick={async () => {
+                    const ok = await confirmar({
+                      title: t('settings.confirmRemovePhone'),
+                      confirmLabel: t('common.remove'),
+                      danger: true,
+                    })
+                    if (ok) guardarTel('')
                   }}
                 >
                   {t('common.remove')}

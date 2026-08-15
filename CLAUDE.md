@@ -49,11 +49,12 @@ schema.sql                  esquema D1
 wrangler.toml               config Pages + binding D1
 functions/api/[[path]].ts   entrada de Pages Functions -> Hono
 src/server/routes.ts        TODA la API (auth, amigos, regalos, reservas, avisos)
+src/server/unfurl.ts        lee título/foto/precio de un enlace (con guardas anti-SSRF)
 src/server/crypto.ts        PBKDF2 (contraseñas), HMAC (DNI), SHA-256 (sesiones)
 src/server/dni.ts           validación DNI/NIE español
 src/api.ts                  cliente HTTP tipado
 src/App.tsx                 rutas + navegación (inferior en móvil, lateral en escritorio)
-src/ui.tsx                  Avatar, Spinner, Empty, ErrorBox, money, useAsync
+src/ui.tsx                  Avatar, Spinner, Empty, ErrorBox, money, useAsync, Reacciones, Dialogos
 src/pages/                  Auth, Home, MyList, FriendList, Friends, Reservations, Settings
 ```
 
@@ -354,6 +355,70 @@ en la cabecera de la lista, y el inicio destaca los que caen dentro de 60 días.
   y ve **una sola vez** un código de 8 caracteres sin letras ambiguas, válido 1 hora y de un solo
   uso, que dicta por teléfono. Con él, la persona pone contraseña nueva y se cierran todas sus
   sesiones. Conocer el DNI de alguien no basta: hace falta que un humano apruebe.
+
+## Que la gente vuelva (captura, pulso y reacciones)
+
+El problema de Cample no es de producto sino de **frecuencia**: se abre cuando toca regalar, y el
+deseo (lo que uno querría recibir) nace fuera de la app. Tres piezas atacan eso:
+
+### Rellenar un regalo desde un enlace
+
+`GET /unfurl?url=` (`src/server/unfurl.ts`) descarga la página y saca `og:title`, `og:image` y
+`og:price`. En el diálogo de nuevo regalo el **enlace va primero**, con un botón «Pegar» (lee el
+portapapeles) y otro de rellenar. Si el regalo llega desde «Compartir con Cample», se intenta leer
+solo y **en silencio**: si falla, la persona escribe y ya, sin ver ningún error que no ha pedido.
+
+⚠️ Esto hace que el servidor descargue una dirección elegida por el usuario (SSRF). `hostPermitido()`
+rechaza IP literales, `localhost` y dominios internos, y la descarga está acotada a 6 s y 512 KB.
+**No relajar eso** para «que funcione con más tiendas». Límite de 60/h por persona.
+
+### Pulso de mi propia lista
+
+`GET /me/pulse` devuelve `views` (**un rango**: `none|few|some|many`), `myGifts` y `friendsAvg`.
+Existe porque la regla 1 deja al dueño a ciegas: si además no ve señal ninguna, deja de apuntar
+cosas y la lista se muere. Sale en `MyList` como una tarjeta.
+
+⚠️ **`views` es `null` si tengo menos de 3 amigos**: con dos, cualquier cifra señala a una persona
+concreta. Y nunca se devuelve el número exacto ni quién ha entrado. Las visitas se guardan en
+`list_views`, una fila por persona y día, desde `GET /lists/:username`.
+
+### Reacciones
+
+`gift_reactions`, una por persona y regalo, cuatro emojis (`EMOJIS` en `routes.ts`). **El dueño SÍ
+las ve**, con nombres: es la única señal alegre que recibe de vuelta y no dice nada de reservas.
+
+- La interfaz avisa **antes** de que la reacción la verá el dueño (`friendList.reactionNotice`).
+  Nadie debe reaccionar creyendo que hace algo privado. **No convertirlas nunca en anónimas**: una
+  reacción anónima sí se leería como «alguien ha cogido esto».
+- Queda una fuga por deducción (quien reacciona puede acabar siendo quien regala). Es consciente y
+  es el precio de que la lista no sea un pozo.
+- Se comparan quitando el selector de variación (U+FE0F): `❤️` y `❤` son el mismo emoji y según el
+  teclado llega uno u otro. Se guarda siempre la forma canónica de `EMOJIS`.
+- Al dejar de ser amigos se borran las reacciones cruzadas (a diferencia de `gift_audience`).
+
+### Toque («pídele que apunte algo»)
+
+`POST /nudge/:username` manda un aviso normal y corriente. Sale en la lista de un amigo cuando
+tiene menos de 3 regalos pendientes. Como mucho uno por semana y pareja. No insinúa nada de
+reservas: solo dice que alguien quiere acertar.
+
+⚠️ Bases anteriores necesitan `migrations/010_engagement.sql`.
+
+📄 Los avisos al móvil (Web Push) están **propuestos y sin hacer**: ver `docs/notificaciones-push.md`.
+
+## Ventanas de confirmar y avisar
+
+`DialogosProvider` + `useDialogos()` en `src/ui.tsx`, montado en `main.tsx`. Sustituye a
+`confirm()` y `alert()` del navegador, que en escritorio salen pegados arriba con letra y botones
+minúsculos y se saltan el listón de accesibilidad de la regla 8.
+
+```ts
+if (await confirmar({ title: '¿Borrar «X»?', confirmLabel: 'Borrar', danger: true })) …
+await avisar(t('common.problem'), e.message)
+```
+
+**No volver a usar `confirm()` ni `alert()`**: el foco entra en la opción segura, Escape cancela y
+los botones miden 48px.
 
 ## Layout
 

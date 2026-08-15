@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../App'
-import { Empty, ErrorBox, Spinner, useAsync } from '../ui'
+import { Empty, ErrorBox, Spinner, useAsync, useDialogos } from '../ui'
 import { localeOf, useT } from '../i18n'
 
 export default function Admin() {
@@ -49,6 +49,7 @@ export default function Admin() {
 
 /** Fallos y sugerencias que manda la gente desde Ajustes. */
 function Buzon() {
+  const { confirmar } = useDialogos()
   const t = useT()
   const list = useAsync(() => api.adminFeedback(), [])
   const [error, setError] = useState('')
@@ -85,8 +86,13 @@ function Buzon() {
                 </button>
                 <button
                   className="btn-danger !py-2 !px-4 !text-sm"
-                  onClick={() => {
-                    if (confirm(t('admin.confirmDeleteFeedback'))) run(api.deleteFeedback(f.id))
+                  onClick={async () => {
+                    const ok = await confirmar({
+                      title: t('admin.confirmDeleteFeedback'),
+                      confirmLabel: t('common.delete'),
+                      danger: true,
+                    })
+                    if (ok) run(api.deleteFeedback(f.id))
                   }}
                 >
                   {t('common.delete')}
@@ -228,6 +234,7 @@ function Resets() {
 }
 
 function Users({ me }: { me: string }) {
+  const { confirmar } = useDialogos()
   const t = useT()
   const list = useAsync(() => api.adminUsers(), [])
   const [error, setError] = useState('')
@@ -267,11 +274,13 @@ function Users({ me }: { me: string }) {
                   </button>
                   <button
                     className="btn-danger !py-2 !px-4 !text-sm"
-                    onClick={() => {
-                      if (
-                        confirm(t('admin.confirmDeleteUser', { name: u.displayName }))
-                      )
-                        act(api.deleteUser(u.username))
+                    onClick={async () => {
+                      const ok = await confirmar({
+                        title: t('admin.confirmDeleteUser', { name: u.displayName }),
+                        confirmLabel: t('common.delete'),
+                        danger: true,
+                      })
+                      if (ok) act(api.deleteUser(u.username))
                     }}
                   >
                     {t('common.delete')}

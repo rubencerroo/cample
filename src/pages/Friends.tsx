@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, User } from '../api'
-import { Avatar, Empty, ErrorBox, Spinner, useAsync } from '../ui'
+import { Avatar, Empty, ErrorBox, Spinner, useAsync, useDialogos } from '../ui'
 import { useT } from '../i18n'
 
 export default function Friends() {
   const t = useT()
+  const { confirmar } = useDialogos()
   const friends = useAsync(() => api.friends(), [])
   const reqs = useAsync(() => api.requests(), [])
   const sugerencias = useAsync(() => api.suggestions(), [])
@@ -131,10 +132,14 @@ export default function Friends() {
             <Row key={u.id} user={u} to={`/lista/${u.username}`}>
               <button
                 className="btn-danger !py-2 !px-4 !text-sm"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.preventDefault()
-                  if (confirm(t('friends.confirmRemove', { name: u.displayName })))
-                    act(api.removeFriend(u.username))
+                  const ok = await confirmar({
+                    title: t('friends.confirmRemove', { name: u.displayName }),
+                    confirmLabel: t('common.remove'),
+                    danger: true,
+                  })
+                  if (ok) act(api.removeFriend(u.username))
                 }}
               >
                 {t('common.remove')}

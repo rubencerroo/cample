@@ -146,6 +146,29 @@ CREATE TABLE IF NOT EXISTS group_messages (
 );
 CREATE INDEX IF NOT EXISTS idx_messages_group ON group_messages(group_id, created_at);
 
+-- Reacciones a los regalos de un amigo («qué buena idea»). NO son reservas y el dueño SÍ las ve:
+-- es la única señal alegre que recibe de vuelta quien se molesta en escribir su lista.
+-- Una por persona y regalo, para que no se conviertan en un contador de nada.
+CREATE TABLE IF NOT EXISTS gift_reactions (
+  gift_id    TEXT NOT NULL REFERENCES gifts(id) ON DELETE CASCADE,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  emoji      TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (gift_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_reactions_gift ON gift_reactions(gift_id);
+
+-- Visitas a la lista de alguien, una fila por persona y día. Solo alimenta el «pulso» de
+-- `GET /me/pulse`, que devuelve un RANGO, nunca un número ni quién ha entrado: saber que una
+-- lista se está mirando anima a llenarla, saber quién la mira empezaría a destripar la sorpresa.
+CREATE TABLE IF NOT EXISTS list_views (
+  owner_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  viewer_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  day       INTEGER NOT NULL,               -- días enteros desde epoch
+  PRIMARY KEY (owner_id, viewer_id, day)
+);
+CREATE INDEX IF NOT EXISTS idx_views_owner ON list_views(owner_id, day);
+
 -- Avisos para quien regala (p. ej. "el regalo que reservaste se ha borrado/editado").
 -- Nunca se generan avisos que revelen reservas al dueño de la lista.
 CREATE TABLE IF NOT EXISTS notifications (

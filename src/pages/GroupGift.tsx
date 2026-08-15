@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, Group } from '../api'
-import { Avatar, ErrorBox, Spinner, money, useAsync } from '../ui'
+import { Avatar, ErrorBox, Spinner, money, useAsync, useDialogos } from '../ui'
 import { localeOf, useT } from '../i18n'
 
 export default function GroupGift() {
   const t = useT()
   const { id = '' } = useParams()
   const nav = useNavigate()
+  const { confirmar } = useDialogos()
   const g = useAsync(() => api.group(id), [id])
   const [error, setError] = useState('')
 
@@ -86,9 +87,13 @@ export default function GroupGift() {
               </button>
               <button
                 className="btn-danger !py-2 !px-4 !text-sm"
-                onClick={() => {
-                  if (confirm(t('group.confirmCancel')))
-                    act(api.updateGroup(group.id, { status: 'cancelled' }))
+                onClick={async () => {
+                  const ok = await confirmar({
+                    title: t('group.confirmCancel'),
+                    confirmLabel: t('group.cancel'),
+                    danger: true,
+                  })
+                  if (ok) act(api.updateGroup(group.id, { status: 'cancelled' }))
                 }}
               >
                 {t('group.cancel')}
@@ -97,8 +102,13 @@ export default function GroupGift() {
           )}
           <button
             className="btn-ghost !py-2 !px-4 !text-sm"
-            onClick={() => {
-              if (confirm(t('group.confirmLeave')))
+            onClick={async () => {
+              const ok = await confirmar({
+                title: t('group.confirmLeave'),
+                confirmLabel: t('group.leave'),
+                danger: true,
+              })
+              if (ok)
                 api
                   .leaveGroup(group.id)
                   .then((r) => (r.cancelled ? nav(`/lista/${group.for.username}`) : g.reload()))
