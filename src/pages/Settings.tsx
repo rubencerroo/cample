@@ -4,6 +4,7 @@ import { api } from '../api'
 import { useAuth } from '../App'
 import { Avatar, ErrorBox, birthdayLabel, fileToAvatarDataUrl, useDialogos } from '../ui'
 import { LANGS, useI18n, useT } from '../i18n'
+import { ICON, Icon } from '../icons'
 
 export default function Settings() {
   const { user, setUser, logout, showGuide } = useAuth()
@@ -141,7 +142,7 @@ export default function Settings() {
           id="datos"
           abierto={abierto}
           setAbierto={setAbierto}
-          icono="👤"
+          icono={ICON.persona}
           titulo={t('settings.yourData')}
           resumen={t('settings.dataSummary')}
         >
@@ -178,7 +179,7 @@ export default function Settings() {
           id="telefono"
           abierto={abierto}
           setAbierto={setAbierto}
-          icono="📱"
+          icono={ICON.telefono}
           titulo={t('settings.phoneTitle')}
           resumen={user.hasPhone ? t('settings.phoneOn') : t('settings.phoneOff')}
         >
@@ -229,7 +230,7 @@ export default function Settings() {
           id="clave"
           abierto={abierto}
           setAbierto={setAbierto}
-          icono="🔑"
+          icono={ICON.llave}
           titulo={t('settings.passwordTitle')}
           resumen={t('settings.passwordSummary')}
         >
@@ -252,7 +253,7 @@ export default function Settings() {
           id="idioma"
           abierto={abierto}
           setAbierto={setAbierto}
-          icono="🌐"
+          icono={ICON.idioma}
           titulo={t('settings.language')}
           resumen={LANGS.find((l) => l.code === lang)?.label ?? ''}
         >
@@ -279,7 +280,7 @@ export default function Settings() {
           id="guia"
           abierto={abierto}
           setAbierto={setAbierto}
-          icono="❓"
+          icono={ICON.ayuda}
           titulo={t('settings.guideTitle')}
           resumen={t('settings.guideSummary')}
         >
@@ -297,7 +298,7 @@ export default function Settings() {
           id="buzon"
           abierto={abierto}
           setAbierto={setAbierto}
-          icono="💬"
+          icono={ICON.buzon}
           titulo={t('settings.feedbackTitle')}
           resumen={t('settings.feedbackSummary')}
         >
@@ -313,7 +314,7 @@ export default function Settings() {
           id="privacidad"
           abierto={abierto}
           setAbierto={setAbierto}
-          icono="🔒"
+          icono={ICON.privacidad}
           titulo={t('settings.privacyTitle')}
           resumen={t('settings.privacySummary')}
         >
@@ -364,7 +365,7 @@ function Fila({
   id: string
   abierto: string | null
   setAbierto: (v: string | null) => void
-  icono: string
+  icono: (typeof ICON)[keyof typeof ICON]
   titulo: string
   resumen?: string
   children: React.ReactNode
@@ -380,16 +381,13 @@ function Fila({
           activo ? 'bg-brand-50' : 'hover:bg-slate-50'
         }`}
       >
-        <span className="text-2xl" aria-hidden>
-          {icono}
-        </span>
+        <Icon icon={icono} size={26} className="shrink-0 text-slate-500" />
         <span className="min-w-0 flex-1">
           <span className={`block font-bold ${activo ? 'text-brand-700' : ''}`}>{titulo}</span>
           {resumen && <span className="block truncate text-sm text-slate-500">{resumen}</span>}
         </span>
-        <span className={`shrink-0 text-xl text-slate-400 transition-transform ${activo ? 'rotate-90' : ''}`} aria-hidden>
-          ›
-        </span>
+        {/* Abrir/cerrar: el icono cambia y morphicons anima la transición él solo. */}
+        <Icon icon={activo ? ICON.arriba : ICON.abajo} size={22} className="shrink-0 text-slate-400" />
       </button>
       {activo && <div className="border-t border-slate-100 px-4 py-4">{children}</div>}
     </div>

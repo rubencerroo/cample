@@ -4,6 +4,7 @@ import { api, Gift } from '../api'
 import { Avatar, Empty, ErrorBox, Reacciones, Spinner, VisibilityChip, money, useAsync, useDialogos } from '../ui'
 import { useAuth } from '../App'
 import { getLang, translate, useT } from '../i18n'
+import { ICON, Icon } from '../icons'
 
 const EMPTY = {
   title: '',
@@ -61,7 +62,8 @@ export default function MyList() {
           <h1 className="text-2xl font-extrabold">{t('myList.title')}</h1>
           <p className="text-slate-600">{t('myList.sub')}</p>
         </div>
-        <button className="btn-primary shrink-0" onClick={() => setEditing('new')}>
+        <button className="btn-primary shrink-0 inline-flex items-center gap-2" onClick={() => setEditing('new')}>
+          <Icon icon={ICON.lista} size={20} />
           {t('myList.add')}
         </button>
       </div>
@@ -103,17 +105,23 @@ export default function MyList() {
                   {/* Quién ha dicho «qué buena idea». Nunca quién lo va a comprar (regla 1). */}
                   <Reacciones reactions={g.reactions} readOnly />
                   <div className="mt-3 flex flex-wrap gap-2">
+                    {/* El icono cambia con el estado, así que la transición se anima sola. */}
                     <button
-                      className="btn-ghost !py-2 !px-4 !text-sm"
+                      className="btn-ghost !py-2 !px-4 !text-sm inline-flex items-center gap-2"
                       onClick={() => api.setReceived(g.id, !g.isReceived).then(list.reload)}
                     >
+                      <Icon icon={g.isReceived ? ICON.deshacer : ICON.recibido} size={18} />
                       {g.isReceived ? t('myList.notGot') : t('myList.got')}
                     </button>
-                    <button className="btn-ghost !py-2 !px-4 !text-sm" onClick={() => setEditing(g)}>
+                    <button
+                      className="btn-ghost !py-2 !px-4 !text-sm inline-flex items-center gap-2"
+                      onClick={() => setEditing(g)}
+                    >
+                      <Icon icon={ICON.editar} size={18} />
                       {t('myList.edit')}
                     </button>
                     <button
-                      className="btn-danger !py-2 !px-4 !text-sm"
+                      className="btn-danger !py-2 !px-4 !text-sm inline-flex items-center gap-2"
                       onClick={async () => {
                         const ok = await confirmar({
                           title: t('myList.confirmDelete', { title: g.title }),
@@ -123,6 +131,7 @@ export default function MyList() {
                         if (ok) api.deleteGift(g.id).then(list.reload)
                       }}
                     >
+                      <Icon icon={ICON.borrar} size={18} />
                       {t('common.delete')}
                     </button>
                   </div>
@@ -384,17 +393,23 @@ function GiftDialog({
             />
             {/* El portapapeles no existe en todos los navegadores; si no está, no se pinta. */}
             {typeof navigator !== 'undefined' && !!navigator.clipboard && (
-              <button type="button" className="btn-ghost !px-4 shrink-0" onClick={pegar}>
+              <button
+                type="button"
+                className="btn-ghost !px-4 shrink-0 inline-flex items-center gap-2"
+                onClick={pegar}
+              >
+                <Icon icon={ICON.pegar} size={18} />
                 {t('gift.paste')}
               </button>
             )}
           </div>
           <button
             type="button"
-            className="btn-ghost mt-2 w-full !py-2 !text-sm"
+            className="btn-ghost mt-2 w-full !py-2 !text-sm inline-flex items-center justify-center gap-2"
             disabled={!f.url.trim() || leyendo}
             onClick={() => rellenar(f.url)}
           >
+            <Icon icon={ICON.magia} size={18} />
             {leyendo ? t('gift.reading') : t('gift.fillFromLink')}
           </button>
           {aviso && <p className="mt-1 text-sm text-slate-500">{aviso}</p>}

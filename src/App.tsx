@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { api, User } from './api'
 import { Avatar, Spinner } from './ui'
+import { ICON, Icon } from './icons'
 import Auth from './pages/Auth'
 import Home from './pages/Home'
 import MyList from './pages/MyList'
@@ -23,11 +24,11 @@ export const useAuth = () => useContext(AuthCtx)
 type Badges = { home: number; friends: number; reservations: number; admin: number }
 
 const NAV = [
-  { to: '/', label: 'nav.home', icon: '🏠', badge: 'home' },
-  { to: '/mi-lista', label: 'nav.myList', icon: '🎁', badge: null },
-  { to: '/amigos', label: 'nav.friends', icon: '👥', badge: 'friends' },
-  { to: '/reservas', label: 'nav.reservations', icon: '🔒', badge: 'reservations' },
-  { to: '/ajustes', label: 'nav.settings', icon: '⚙️', badge: null },
+  { to: '/', label: 'nav.home', icon: ICON.inicio, badge: 'home' },
+  { to: '/mi-lista', label: 'nav.myList', icon: ICON.lista, badge: null },
+  { to: '/amigos', label: 'nav.friends', icon: ICON.amigos, badge: 'friends' },
+  { to: '/reservas', label: 'nav.reservations', icon: ICON.reservas, badge: 'reservations' },
+  { to: '/ajustes', label: 'nav.settings', icon: ICON.ajustes, badge: null },
 ] as const
 
 /** Globito con el número de cosas pendientes de esa pestaña. */
@@ -80,7 +81,7 @@ export default function App() {
   const verGuia = guide || user.onboardingSeen < ONBOARDING_VERSION
 
   const nav = user.isAdmin
-    ? [...NAV, { to: '/admin', label: 'nav.admin', icon: '🛡️', badge: 'admin' } as const]
+    ? [...NAV, { to: '/admin', label: 'nav.admin', icon: ICON.admin, badge: 'admin' } as const]
     : NAV
 
   return (
@@ -125,7 +126,7 @@ export default function App() {
                   }`
                 }
               >
-                <span aria-hidden>{n.icon}</span>
+                <Icon icon={n.icon} size={22} />
                 <span className="flex-1">{t(n.label)}</span>
                 <Badge n={n.badge ? badges[n.badge] : 0} />
               </NavLink>
@@ -159,8 +160,8 @@ export default function App() {
                   active ? 'text-brand-600' : 'text-slate-500'
                 }`}
               >
-                <span className="relative text-xl" aria-hidden>
-                  {n.icon}
+                <span className="relative flex items-center justify-center">
+                  <Icon icon={n.icon} size={24} />
                   <Badge
                     n={n.badge ? badges[n.badge] : 0}
                     className="absolute -right-2.5 -top-1 border-2 border-white"

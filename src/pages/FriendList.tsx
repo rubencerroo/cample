@@ -15,6 +15,7 @@ import {
   useDialogos,
 } from '../ui'
 import { useT } from '../i18n'
+import { ICON, Icon } from '../icons'
 
 export default function FriendList() {
   const t = useT()
@@ -111,9 +112,7 @@ export default function FriendList() {
                         to={`/colecta/${g.group.id}`}
                         className="mt-3 flex items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 hover:bg-brand-100"
                       >
-                        <span className="text-2xl" aria-hidden>
-                          🤝
-                        </span>
+                        <Icon icon={ICON.colecta} size={28} className="shrink-0 text-brand-700" />
                         <span className="min-w-0 flex-1">
                           <span className="block font-semibold text-brand-800">
                             {g.group.status === 'bought' ? t('friendList.groupBought') : t('friendList.groupRunning')}
@@ -165,7 +164,11 @@ export default function FriendList() {
                         )
                       )}
                       {!g.group && !g.reservedByMe && free && (
-                        <button className="btn-ghost !py-2 !px-4 !text-sm" onClick={() => setGrouping(g)}>
+                        <button
+                          className="btn-ghost !py-2 !px-4 !text-sm inline-flex items-center gap-2"
+                          onClick={() => setGrouping(g)}
+                        >
+                          <Icon icon={ICON.colecta} size={18} />
                           {t('friendList.groupGift')}
                         </button>
                       )}
@@ -217,7 +220,7 @@ function Toque({ user }: { user: { username: string; displayName: string } }) {
 
   return (
     <div className="card flex flex-wrap items-center gap-3 border-dashed">
-      <span className="text-2xl" aria-hidden>💡</span>
+      <Icon icon={ICON.idea} size={28} className="text-brand-600" />
       <p className="min-w-40 flex-1 text-sm text-slate-600">
         {t('friendList.nudgeText', { name: user.displayName.split(' ')[0] })}
       </p>
