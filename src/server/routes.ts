@@ -71,12 +71,25 @@ async function notify(
   body: string,
   link?: string,
   push?: string,
+  // Nace leído: el aviso llega al móvil pero no suma en el globito de Inicio. Para lo que ya tiene
+  // su propio contador en otra pestaña (los mensajes de una colecta) o no es una novedad que leer.
+  yaLeido = false,
 ) {
   await env.DB.prepare(
-    'INSERT INTO notifications (id, user_id, kind, body, link, created_at, push_state, push_body) ' +
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO notifications (id, user_id, kind, body, link, is_read, created_at, push_state, push_body) ' +
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
   )
-    .bind(randomId(8), userId, kind, body, link ?? null, now(), push ? 1 : 0, push ?? null)
+    .bind(
+      randomId(8),
+      userId,
+      kind,
+      body,
+      link ?? null,
+      yaLeido ? 1 : 0,
+      now(),
+      push ? 1 : 0,
+      push ?? null,
+    )
     .run()
   if (push) await enviarPush(env, userId)
 }
@@ -611,7 +624,8 @@ app.get('/admin/stats', auth, adminOnly, async (c) => {
             (SELECT COUNT(*) FROM friendships) AS amistades,
             (SELECT COUNT(*) FROM friend_requests) AS solicitudes,
             (SELECT COUNT(*) FROM password_resets WHERE status = 'pending') AS resets,
-            (SELECT COUNT(*) FROM gift_groups WHERE status = 'open') AS colectas`,
+            (SELECT COUNT(*) FROM gift_groups WHERE status = 'open') AS colectas,
+            (SELECT COUNT(DISTINCT user_id) FROM push_subs) AS avisos`,
   ).first<any>()
   return c.json({
     stats: {
@@ -2183,21 +2197,8 @@ app.post('/groups/:id/messages', auth, async (c) => {
     .all<{ user_id: string }>()
   for (const m of miembros) {
     if (!(await rateLimit(c.env, `pushg:${m.user_id}:${acc.group.id}`, 1, 3600))) continue
-    await c.env.DB.prepare(
-      'INSERT INTO notifications (id, user_id, kind, body, link, is_read, created_at, push_state, push_body) ' +
-        'VALUES (?, ?, ?, ?, ?, 1, ?, 1, ?)',
-    )
-      .bind(
-        randomId(8),
-        m.user_id,
-        'group',
-        'Hay mensajes nuevos en la colecta',
-        `/colecta/${acc.group.id}`,
-        now(),
-        'Hay mensajes nuevos en la colecta',
-      )
-      .run()
-    await enviarPush(c.env, m.user_id)
+    const texto = 'Hay mensajes nuevos en la colecta'
+    await notify(c.env, m.user_id, 'group', texto, `/colecta/${acc.group.id}`, texto, true)
   }
   return c.json({ ok: true })
 })
@@ -2475,6 +2476,47 @@ app.get('/push/pending', auth, async (c) => {
     body: n?.push_body ?? n?.body ?? textoAviso(u?.push_lang, 'aviso.generico'),
     link: n?.link ?? '/',
   })
+})
+
+/** Un aviso de prueba a uno mismo, para comprobar desde Ajustes que llegan de verdad. */
+app.post('/push/test', auth, async (c) => {
+  if (!pushConfigurado(c.env)) return c.json({ error: 'No encontrado' }, 404)
+  if (!(await rateLimit(c.env, `pushtest:${c.get('userId')}`, 5, 3600)))
+    return c.json({ error: 'Demasiados intentos, prueba dentro de un rato' }, 429)
+  const u = await c.env.DB.prepare('SELECT push_lang FROM users WHERE id = ?')
+    .bind(c.get('userId'))
+    .first<{ push_lang: string | null }>()
+  const texto = textoAviso(u?.push_lang, 'aviso.prueba')
+  // Nace leído: es una prueba que ha pedido la propia persona, no una novedad que tenga que leer.
+  await notify(c.env, c.get('userId'), 'test', texto, '/ajustes', texto, true)
+  return c.json({ ok: true })
+})
+
+/**
+ * Un aviso escrito a mano por un administrador, a todo el mundo o a personas concretas.
+ *
+ * Es la única forma que hay de contarle algo a la familia (no hay email en todo el sistema), así
+ * que existe; pero llega a una pantalla de bloqueo, o sea que el aviso de la interfaz recuerda que
+ * ahí no se habla de regalos ni de quién lleva qué. Va sin enlace propio: siempre a Inicio.
+ */
+app.post('/admin/notify', auth, adminOnly, async (c) => {
+  const b = await c.req.json().catch(() => ({}))
+  const texto = String(b.body ?? '').trim().slice(0, 200)
+  const todos = b.all === true
+  const usernames = Array.isArray(b.usernames) ? b.usernames.map((x: unknown) => String(x)) : []
+  if (texto.length < 3) return c.json({ error: 'Escribe algo' }, 400)
+  if (!todos && !usernames.length) return c.json({ error: 'Elige a quién se lo mandas' }, 400)
+
+  const { results } = todos
+    ? await c.env.DB.prepare('SELECT id FROM users WHERE is_active = 1').all<{ id: string }>()
+    : await c.env.DB.prepare(
+        `SELECT id FROM users WHERE is_active = 1 AND username IN (${usernames.map(() => '?').join(',')})`,
+      )
+        .bind(...usernames)
+        .all<{ id: string }>()
+
+  for (const u of results) await notify(c.env, u.id, 'admin', texto, '/', texto)
+  return c.json({ ok: true, sent: results.length })
 })
 
 /* --------------------------- el repaso semanal ---------------------------- */

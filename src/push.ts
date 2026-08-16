@@ -53,6 +53,9 @@ export async function activarPush(): Promise<boolean> {
   if (permiso !== 'granted') return false
 
   const reg = await navigator.serviceWorker.ready
+  // Quien ya tenía la app instalada arrastra el service worker viejo, que no sabe recibir avisos.
+  // Se le fuerza a actualizarse antes de suscribir nada; si no, el aviso llegaría en blanco.
+  await reg.update().catch(() => {})
   const sub =
     (await reg.pushManager.getSubscription()) ??
     (await reg.pushManager.subscribe({

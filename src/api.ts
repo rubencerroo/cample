@@ -196,6 +196,7 @@ export const api = {
         solicitudes: number
         resets: number
         colectas: number
+        avisos: number
         db: { used: number; limit: number; photos: number }
       }
     }>('/admin/stats'),
@@ -286,6 +287,9 @@ export const api = {
     req('/push/subscribe', { method: 'POST', ...body(d) }),
   unsubscribePush: (endpoint?: string) =>
     req('/push/unsubscribe', { method: 'POST', ...body({ endpoint }) }),
+  testPush: () => req('/push/test', { method: 'POST' }),
+  adminNotify: (d: { body: string; all?: boolean; usernames?: string[] }) =>
+    req<{ sent: number }>('/admin/notify', { method: 'POST', ...body(d) }),
 
   badges: () =>
     req<{ badges: { home: number; friends: number; reservations: number; admin: number } }>('/badges'),

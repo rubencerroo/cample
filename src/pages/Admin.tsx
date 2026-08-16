@@ -8,7 +8,7 @@ import { ICON, Icon } from '../icons'
 export default function Admin() {
   const { user } = useAuth()
   const t = useT()
-  const [tab, setTab] = useState<'resets' | 'users' | 'feedback'>('resets')
+  const [tab, setTab] = useState<'resets' | 'users' | 'feedback' | 'avisos'>('resets')
 
   if (!user.isAdmin) return <Empty title={t('admin.notForYou')} />
 
@@ -21,12 +21,14 @@ export default function Admin() {
 
       <Stats />
 
-      <div className="grid grid-cols-3 gap-2 rounded-2xl bg-slate-100 p-1">
+      {/* Cuatro pestañas no caben en una fila de móvil sin dejar los botones por debajo de 48px. */}
+      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1 sm:grid-cols-4">
         {(
           [
             ['resets', t('admin.tabResets')],
             ['users', t('admin.tabUsers')],
             ['feedback', t('admin.tabInbox')],
+            ['avisos', t('admin.tabNotify')],
           ] as const
         ).map(([k, l]) => (
           <button
@@ -39,7 +41,15 @@ export default function Admin() {
         ))}
       </div>
 
-      {tab === 'resets' ? <Resets /> : tab === 'users' ? <Users me={user.username} /> : <Buzon />}
+      {tab === 'resets' ? (
+        <Resets />
+      ) : tab === 'users' ? (
+        <Users me={user.username} />
+      ) : tab === 'feedback' ? (
+        <Buzon />
+      ) : (
+        <Avisos />
+      )}
     </div>
   )
 }
@@ -123,12 +133,13 @@ function Stats() {
     [t('admin.statGifts'), st.regalos],
     [t('admin.statFriendships'), st.amistades],
     [t('admin.statGroups'), st.colectas],
+    [t('admin.statPush'), st.avisos],
   ]
   const pct = (st.db.used / st.db.limit) * 100
 
   return (
     <div className="space-y-3">
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {items.map(([l, v]) => (
           <li key={l} className="card text-center">
             <p className="text-2xl font-extrabold text-brand-600">{v}</p>
@@ -227,6 +238,142 @@ function Resets() {
       ) : (
         <Empty title={t('admin.noResets')} />
       )}
+    </div>
+  )
+}
+
+/**
+ * Mandar un aviso escrito a mano, a todo el mundo o a personas concretas.
+ *
+ * No hay email en Cample a propósito, así que esta es la única forma de contarle algo a la gente
+ * («mañana no va a estar disponible», «ya se puede subir foto a los regalos»). Llega a una pantalla
+ * de bloqueo, y de ahí el recordatorio de no hablar nunca de regalos ni de quién lleva qué: quien
+ * esté al lado del móvil lo lee, y un aviso no se puede retirar.
+ */
+function Avisos() {
+  const t = useT()
+  const { confirmar, avisar } = useDialogos()
+  const lista = useAsync(() => api.adminUsers(), [])
+  const [texto, setTexto] = useState('')
+  const [todos, setTodos] = useState(true)
+  const [elegidos, setElegidos] = useState<string[]>([])
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const activos = lista.data?.users.filter((u) => u.isActive) ?? []
+  const cuantos = todos ? activos.length : elegidos.length
+
+  async function enviar() {
+    setError('')
+    const ok = await confirmar({
+      title: t('admin.notifyConfirm', { n: cuantos }),
+      confirmLabel: t('common.send'),
+    })
+    if (!ok) return
+    setBusy(true)
+    try {
+      const r = await api.adminNotify({
+        body: texto.trim(),
+        all: todos,
+        usernames: todos ? undefined : elegidos,
+      })
+      setTexto('')
+      setElegidos([])
+      await avisar(t('admin.notifySent'), t('admin.notifySentText', { n: r.sent }))
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-slate-600">{t('admin.notifyIntro')}</p>
+      <p className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900">
+        {t('admin.notifyWarning')}
+      </p>
+
+      <div>
+        <label className="label" htmlFor="av">{t('admin.notifyLabel')}</label>
+        <textarea
+          id="av"
+          className="input min-h-28"
+          maxLength={200}
+          placeholder={t('admin.notifyPlaceholder')}
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+        />
+        <p className="mt-1.5 text-sm text-slate-500">{t('admin.notifyLeft', { n: 200 - texto.length })}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {(
+          [
+            [true, t('admin.notifyAll')],
+            [false, t('admin.notifySome')],
+          ] as const
+        ).map(([v, l]) => (
+          <button
+            key={String(v)}
+            type="button"
+            onClick={() => setTodos(v)}
+            className={`rounded-2xl border py-3 font-semibold ${
+              todos === v ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-300 text-slate-600'
+            }`}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {!todos &&
+        (lista.loading ? (
+          <Spinner />
+        ) : (
+          <ul className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200">
+            {activos.map((u) => {
+              const marcado = elegidos.includes(u.username)
+              return (
+                <li key={u.username}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setElegidos(
+                        marcado ? elegidos.filter((x) => x !== u.username) : [...elegidos, u.username],
+                      )
+                    }
+                    className={`flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left ${
+                      marcado ? 'bg-brand-50' : ''
+                    }`}
+                  >
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 ${
+                        marcado ? 'border-brand-500 bg-brand-500 text-white' : 'border-slate-300'
+                      }`}
+                    >
+                      {marcado && <Icon icon={ICON.check} size={16} />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold">{u.displayName}</span>
+                      <span className="block truncate text-sm text-slate-500">@{u.username}</span>
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        ))}
+
+      <ErrorBox>{error}</ErrorBox>
+
+      <button
+        className="btn-primary w-full"
+        disabled={busy || texto.trim().length < 3 || cuantos === 0}
+        onClick={enviar}
+      >
+        {t('admin.notifySend', { n: cuantos })}
+      </button>
     </div>
   )
 }

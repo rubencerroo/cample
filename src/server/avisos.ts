@@ -15,6 +15,7 @@ type Tabla = Record<string, string>
 
 const ES: Tabla = {
   'aviso.generico': 'Tienes algo nuevo en Cample',
+  'aviso.prueba': 'Aviso de prueba: si lees esto, funciona.',
   'aviso.cumple': 'El cumple de {nombre} es dentro de {dias} días. Mira su lista con tiempo.',
   'aviso.cumpleManana': 'Mañana es el cumple de {nombre}.',
   'aviso.miCumple': 'Tu cumple es dentro de {dias} días y tu lista está casi vacía. Apunta algo.',
@@ -28,6 +29,7 @@ const ES: Tabla = {
 
 const EN: Tabla = {
   'aviso.generico': 'You have something new on Cample',
+  'aviso.prueba': 'Test notification: if you can read this, it works.',
   'aviso.cumple': "{nombre}'s birthday is in {dias} days. Have a look at their list.",
   'aviso.cumpleManana': "Tomorrow is {nombre}'s birthday.",
   'aviso.miCumple': 'Your birthday is in {dias} days and your list is nearly empty. Add something.',
@@ -41,6 +43,7 @@ const EN: Tabla = {
 
 const FR: Tabla = {
   'aviso.generico': 'Tu as du nouveau sur Cample',
+  'aviso.prueba': "Avis de test : si tu lis ceci, ça marche.",
   'aviso.cumple': "L'anniversaire de {nombre} est dans {dias} jours. Regarde sa liste.",
   'aviso.cumpleManana': "Demain, c'est l'anniversaire de {nombre}.",
   'aviso.miCumple':

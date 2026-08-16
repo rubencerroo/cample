@@ -468,6 +468,7 @@ function Avisos() {
   const [estado, setEstado] = useState<EstadoPush | null>(null)
   const [hayClave, setHayClave] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
 
   useEffect(() => {
     estadoPush().then(setEstado)
@@ -492,16 +493,52 @@ function Avisos() {
         {esIphone() && !instalada() ? t('push.iosNeedsInstall') : t('push.unsupported')}
       </p>
     )
-  if (estado === 'bloqueado') return <p className="text-slate-600">{t('push.blocked')}</p>
+
+  // Bloqueado: el navegador no vuelve a preguntar, así que lo único que se puede hacer es explicar
+  // dónde se cambia. Cada sistema lo esconde en un sitio distinto y por eso van los tres.
+  if (estado === 'bloqueado')
+    return (
+      <div className="space-y-3">
+        <p className="text-slate-600">{t('push.blocked')}</p>
+        <ol className="space-y-2 rounded-2xl bg-slate-50 px-4 py-3 text-slate-700">
+          <li>{t('push.blockedAndroid')}</li>
+          <li>{t('push.blockedIos')}</li>
+          <li>{t('push.blockedDesktop')}</li>
+        </ol>
+      </div>
+    )
 
   return (
     <div className="space-y-3">
       <p className="text-slate-600">{t('push.text')}</p>
       <p className="text-sm text-slate-500">{t('push.calm')}</p>
+      {msg && <div className="rounded-2xl bg-green-50 border border-green-200 px-4 py-3 text-green-700">{msg}</div>}
       {estado === 'activo' ? (
-        <button className="btn-ghost w-full" disabled={busy} onClick={() => cambiar(false)}>
-          {t('push.disable')}
-        </button>
+        <>
+          <p className="rounded-2xl bg-green-50 border border-green-200 px-4 py-3 text-green-700">
+            {t('push.on')}
+          </p>
+          {/* Comprobarlo en el momento evita la duda de «¿estará puesto de verdad?». */}
+          <button
+            className="btn-primary w-full"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true)
+              try {
+                await api.testPush()
+                setMsg(t('push.testSent'))
+                setTimeout(() => setMsg(''), 4000)
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
+            {t('push.test')}
+          </button>
+          <button className="btn-ghost w-full" disabled={busy} onClick={() => cambiar(false)}>
+            {t('push.disable')}
+          </button>
+        </>
       ) : (
         <button className="btn-primary w-full" disabled={busy} onClick={() => cambiar(true)}>
           {t('push.enable')}

@@ -365,6 +365,28 @@ export const fr: Dict = {
   'push.unsupported': "Ce navigateur ne peut pas envoyer d'avis.",
   'push.iosNeedsInstall':
     "Sur iPhone, les avis ne marchent que si tu ajoutes Cample à l'écran d'accueil. Fais-le et reviens ici.",
+  'push.on': 'Les avis sont allumés sur cet appareil.',
+  'push.test': "M'envoyer un avis de test",
+  'push.testSent': 'Envoyé. Il devrait arriver dans quelques secondes.',
+  'push.blockedAndroid':
+    "Sur Android : appuie longuement sur l'icône de Cample → Infos sur l'appli → Notifications.",
+  'push.blockedIos': 'Sur iPhone : Réglages → Notifications → Cample.',
+  'push.blockedDesktop': "Sur ordinateur : clique sur le cadenas à côté de l'adresse de la page.",
+  'admin.tabNotify': 'Avis',
+  'admin.statPush': 'avec avis',
+  'admin.notifyIntro':
+    "Envoie un avis écrit par toi. Il arrive dans l'appli et, pour qui les a allumés, sur le téléphone aussi.",
+  'admin.notifyWarning':
+    "🤫 Ceci s'affiche sur l'écran verrouillé et n'importe qui à côté peut le lire : ne parle jamais de cadeaux ni de qui apporte quoi.",
+  'admin.notifyLabel': "L'avis",
+  'admin.notifyPlaceholder': 'Ex. : On peut maintenant ajouter des photos aux cadeaux depuis la galerie.',
+  'admin.notifyLeft': 'Il reste {n} caractères.',
+  'admin.notifyAll': 'À tout le monde',
+  'admin.notifySome': 'À qui je choisis',
+  'admin.notifySend': 'Envoyer à {n} personnes',
+  'admin.notifyConfirm': 'Envoyer cet avis à {n} personnes ?',
+  'admin.notifySent': 'Avis envoyé',
+  'admin.notifySentText': 'Il est arrivé à {n} personnes.',
   'push.blocked':
     'Tu as bloqué les avis de Cample dans ce navigateur. Pour les réactiver, il faut les autoriser dans les réglages du navigateur.',
 
