@@ -18,7 +18,9 @@ CREATE TABLE IF NOT EXISTS users (
   onboarding_seen INTEGER NOT NULL DEFAULT 0, -- versión de la guía de bienvenida ya vista
   trust_level  INTEGER NOT NULL DEFAULT 0,    -- 0 normal, 1 verificada (ve las reservas sin espera)
   trust_source TEXT,                          -- 'admin' | 'phone' | 'dni'
-  trusted_at   INTEGER
+  trusted_at   INTEGER,
+  push_lang    TEXT,                          -- idioma con el que se redactan los avisos del repaso
+  push_last_at INTEGER NOT NULL DEFAULT 0     -- último aviso del repaso semanal (para no ser pesado)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone_hash) WHERE phone_hash IS NOT NULL;
@@ -218,9 +220,34 @@ CREATE TABLE IF NOT EXISTS notifications (
   body       TEXT NOT NULL,
   link       TEXT,
   is_read    INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  -- Aviso al móvil: 0 no se empuja, 1 empujado y sin recoger, 2 ya recogido por el aparato.
+  -- Solo se empuja lo que trae `push_body`: si no se escribe a mano, no sale del móvil de nadie.
+  push_state INTEGER NOT NULL DEFAULT 0,
+  push_body  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_notif_push ON notifications(user_id, push_state);
+
+-- Aparatos suscritos a los avisos. Una persona puede tener varios (móvil y ordenador).
+CREATE TABLE IF NOT EXISTS push_subs (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint   TEXT NOT NULL UNIQUE,            -- la dirección que da el navegador
+  p256dh     TEXT NOT NULL,                   -- claves del navegador (hoy sin uso: el aviso va vacío)
+  auth       TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_push_user ON push_subs(user_id);
+
+-- Qué avisos del repaso se han mandado ya, para no repetir el mismo una y otra vez.
+-- `key` es del estilo 'cumple:<amigo>:2026' o 'pulso:2026-08'.
+CREATE TABLE IF NOT EXISTS push_sent (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  key     TEXT NOT NULL,
+  at      INTEGER NOT NULL,
+  PRIMARY KEY (user_id, key)
+);
 
 -- Fallos y sugerencias que manda la gente desde Ajustes. Solo los leen los administradores.
 CREATE TABLE IF NOT EXISTS feedback (

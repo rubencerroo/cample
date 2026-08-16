@@ -52,6 +52,9 @@ functions/api/[[path]].ts   entrada de Pages Functions -> Hono
 src/server/routes.ts        TODA la API (auth, amigos, regalos, reservas, avisos)
 src/server/unfurl.ts        lee título/foto/precio de un enlace (con guardas anti-SSRF)
 src/server/crypto.ts        PBKDF2 (contraseñas), HMAC (DNI), SHA-256 (sesiones)
+src/server/push.ts          avisos al móvil: firma VAPID y envío (el aviso va vacío)
+src/server/avisos.ts        textos del repaso semanal en los tres idiomas
+cron/                       Worker aparte que despierta el repaso (Pages no tiene cron)
 src/server/dni.ts           validación DNI/NIE español
 src/api.ts                  cliente HTTP tipado
 src/App.tsx                 rutas + navegación (inferior en móvil, lateral en escritorio)
@@ -131,14 +134,17 @@ llegar.
   el dueño sepa que ese aviso ha existido.
 
 ### Secretos
-`DNI_PEPPER` y `SESSION_PEPPER`. En local van en `.dev.vars` (ignorado por git). En producción:
+`DNI_PEPPER`, `SESSION_PEPPER`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` y
+`CRON_SECRET`. En local van en `.dev.vars` (ignorado por git). En producción:
 
 ```bash
 npx wrangler pages secret put DNI_PEPPER
 ```
 
 ⚠️ Si `DNI_PEPPER` cambia, se pierde la unicidad de DNI de las cuentas ya creadas. Nunca rotarlo
-sin migración. Si `SESSION_PEPPER` cambia, se cierran todas las sesiones (eso sí es asumible).
+sin migración. Si `SESSION_PEPPER` cambia, se cierran todas las sesiones (eso sí es asumible). Si
+cambia `VAPID_PRIVATE_KEY`, todas las suscripciones de push dejan de valer y hay que **volver a
+pedir el permiso**, que es algo que el navegador solo pregunta una vez en la vida.
 
 ## Desarrollo
 
@@ -364,9 +370,9 @@ Copiado de Instagram, que es donde la gente ya ha aprendido cómo funciona:
 
 ## Instalar en el móvil y «Compartir con Cample»
 
-- `public/sw.js` es un service worker **deliberadamente vacío** (solo un `fetch` que no hace nada):
-  existe porque Chrome exige un manejador de `fetch` para considerar la app instalable y para que
-  funcione el share target. **No cachear nada ahí**: una respuesta mala pegada en la caché de un
+- `public/sw.js` solo tiene el `fetch` vacío que Chrome exige para considerar la app instalable y
+  que funcione el share target, más los manejadores de `push` y `notificationclick`. **No cachear
+  nada ahí**: una respuesta mala pegada en la caché de un
   móvil ajeno no hay forma de arreglarla (mismo motivo que la caché corta de los avatares).
 - `src/InstallPrompt.tsx`: modal que invita a instalar. Solo en móvil, nunca si ya está instalada
   (`display-mode: standalone` / `navigator.standalone`), y al cerrarlo no vuelve en 30 días
@@ -508,7 +514,29 @@ reservas: solo dice que alguien quiere acertar.
 
 ⚠️ Bases anteriores necesitan `migrations/010_engagement.sql`.
 
-📄 Los avisos al móvil (Web Push) están **propuestos y sin hacer**: ver `docs/notificaciones-push.md`.
+### Avisos al móvil (Web Push)
+
+Hechos y en marcha. Los detalles y el porqué de cada decisión están en
+`docs/notificaciones-push.md`; lo que hay que tener en la cabeza al tocar código:
+
+- **Solo se empuja lo que lleva texto de push escrito a mano** en `notify(env, uid, kind, body,
+  link, push)`. No hay lista negra que se pueda olvidar de actualizar: un aviso nuevo no sale del
+  móvil de nadie hasta que alguien escriba ese sexto argumento, que es justo el momento de pararse a
+  pensar si eso puede leerse en una pantalla de bloqueo. ⚠️ **Nada de reservas ni de colectas hacia
+  el dueño** (regla 1): un push no se puede retirar.
+- **El aviso viaja vacío** y el service worker viene a buscar el texto a `GET /push/pending`. Así no
+  hay que cifrar el cuerpo (RFC 8291) y el texto sale en el idioma de cada persona.
+- **Pages no tiene cron.** El repaso lo despierta el Worker de `cron/` cada hora llamando a
+  `POST /cron/tick` con `X-Cron-Secret`. Si se toca `CRON_SECRET`, hay que cambiarlo en los dos
+  sitios (`npx wrangler pages secret put` y, dentro de `cron/`, `npx wrangler secret put`).
+- **Ser pesado es la única forma de estropear esto**: como mucho un aviso del repaso cada 6 días por
+  persona, cada una con su propio día y hora (entre las 10 y las 20) sacados de `numeroDe(id +
+  semana)`, y seis clases de mensaje que se van barajando con claves en `push_sent` para no
+  repetirse. Si un día no hay nada que contar, no se manda nada.
+- El permiso **solo se pregunta una vez en la vida**: nunca lanzar el cuadro del navegador sin
+  enseñar antes `AvisosPrompt`. En iPhone no existe si la app no está instalada.
+
+⚠️ Bases anteriores necesitan `migrations/014_push.sql`.
 
 ## Ventanas de confirmar y avisar
 

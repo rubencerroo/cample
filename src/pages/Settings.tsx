@@ -1,6 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
+import {
+  activarPush,
+  desactivarPush,
+  esIphone,
+  estadoPush,
+  instalada,
+  type EstadoPush,
+} from '../push'
 import { useAuth } from '../App'
 import {
   Avatar,
@@ -296,6 +304,17 @@ export default function Settings() {
         </Fila>
 
         <Fila
+          id="avisos"
+          abierto={abierto}
+          setAbierto={setAbierto}
+          icono={ICON.campana}
+          titulo={t('push.settingsTitle')}
+          resumen={t('push.settingsSummary')}
+        >
+          <Avisos />
+        </Fila>
+
+        <Fila
           id="guia"
           abierto={abierto}
           setAbierto={setAbierto}
@@ -433,6 +452,62 @@ function CambiarUsuario() {
         {t('common.save')}
       </button>
     </form>
+  )
+}
+
+/**
+ * Encender y apagar los avisos al móvil. Con interruptor desde el primer día: un aviso que no se
+ * puede apagar se acaba apagando desinstalando la app.
+ *
+ * Los tres estados que hay que contar bien son: este aparato no puede (iPhone sin instalar),
+ * la persona dijo que no en su día (y eso solo se arregla en los ajustes del navegador), y el
+ * normal de encendido/apagado.
+ */
+function Avisos() {
+  const t = useT()
+  const [estado, setEstado] = useState<EstadoPush | null>(null)
+  const [hayClave, setHayClave] = useState(true)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    estadoPush().then(setEstado)
+    api.pushKey().then(({ key }) => setHayClave(!!key)).catch(() => {})
+  }, [])
+
+  const cambiar = async (encender: boolean) => {
+    setBusy(true)
+    try {
+      if (encender) await activarPush()
+      else await desactivarPush()
+    } finally {
+      setEstado(await estadoPush())
+      setBusy(false)
+    }
+  }
+
+  if (estado === null) return null
+  if (!hayClave || estado === 'no-disponible' || (esIphone() && !instalada()))
+    return (
+      <p className="text-slate-600">
+        {esIphone() && !instalada() ? t('push.iosNeedsInstall') : t('push.unsupported')}
+      </p>
+    )
+  if (estado === 'bloqueado') return <p className="text-slate-600">{t('push.blocked')}</p>
+
+  return (
+    <div className="space-y-3">
+      <p className="text-slate-600">{t('push.text')}</p>
+      <p className="text-sm text-slate-500">{t('push.calm')}</p>
+      {estado === 'activo' ? (
+        <button className="btn-ghost w-full" disabled={busy} onClick={() => cambiar(false)}>
+          {t('push.disable')}
+        </button>
+      ) : (
+        <button className="btn-primary w-full" disabled={busy} onClick={() => cambiar(true)}>
+          {t('push.enable')}
+        </button>
+      )}
+    </div>
   )
 }
 

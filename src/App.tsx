@@ -13,8 +13,10 @@ import Settings from './pages/Settings'
 import Admin from './pages/Admin'
 import GroupGift from './pages/GroupGift'
 import Onboarding, { ONBOARDING_VERSION } from './pages/Onboarding'
-import InstallPrompt from './InstallPrompt'
+import InstallPrompt, { instalarPendiente } from './InstallPrompt'
+import AvisosPrompt from './AvisosPrompt'
 import CompletarPerfil, { telefonoPendiente } from './CompletarPerfil'
+import { desactivarPush } from './push'
 import { useT } from './i18n'
 
 type Ctx = { user: User; setUser: (u: User) => void; logout: () => void; showGuide: () => void }
@@ -73,8 +75,10 @@ export default function App() {
   if (!ready) return <Spinner />
   if (!user) return <Auth onAuth={setUser} />
 
+  // Al cerrar sesión se apagan los avisos de este aparato: en la tablet de casa, si no, seguirían
+  // llegando los de la persona anterior.
   const logout = () => {
-    api.logout().finally(() => setUser(null))
+    desactivarPush().finally(() => api.logout().finally(() => setUser(null)))
   }
 
   // La guía sale sola la primera vez, y también a quien aún no la haya visto.
@@ -94,9 +98,10 @@ export default function App() {
           }}
         />
       )}
-      {/* Solo una ventana emergente a la vez: guía, luego teléfono, luego instalar. */}
+      {/* Solo una ventana a la vez: guía, teléfono, instalar y por último los avisos. */}
       {!verGuia && <CompletarPerfil />}
       {!verGuia && !telefonoPendiente(user) && <InstallPrompt />}
+      {!verGuia && !telefonoPendiente(user) && !instalarPendiente() && <AvisosPrompt />}
 
       <div className="flex min-h-dvh w-full flex-col">
         <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">

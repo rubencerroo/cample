@@ -19,6 +19,10 @@ const yaInstalada = () =>
 const esIphone = () => /iphone|ipad|ipod/i.test(navigator.userAgent)
 const esMovil = () => esIphone() || /android/i.test(navigator.userAgent)
 
+/** Para que App no apile dos ventanas: primero instalar, y ya luego los avisos. */
+export const instalarPendiente = () =>
+  !yaInstalada() && esMovil() && Date.now() >= Number(localStorage.getItem(OCULTO) || 0)
+
 export default function InstallPrompt() {
   const t = useT()
   const [evento, setEvento] = useState<PromptEvent | null>(null)

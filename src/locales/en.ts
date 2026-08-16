@@ -340,6 +340,23 @@ export const en: Dict = {
   'install.ios2': '2. Scroll down and choose "Add to Home Screen".',
   'install.later': 'Not now',
 
+  'push.title': 'Let Cample remind you',
+  'push.text': 'A message on your phone when there is really something to do.',
+  'push.item1': "When someone's birthday is coming up.",
+  'push.item2': 'When someone wants to add you.',
+  'push.item3': 'When there is news in a group present of yours.',
+  'push.calm': 'At most one a week, never at night. You can turn it off whenever you like.',
+  'push.enable': 'Yes, let me know',
+  'push.later': 'Not now',
+  'push.disable': 'Turn notifications off',
+  'push.settingsTitle': 'Phone notifications',
+  'push.settingsSummary': 'Birthdays and news',
+  'push.unsupported': 'This browser cannot send notifications.',
+  'push.iosNeedsInstall':
+    'On iPhone, notifications only work if you add Cample to your home screen. Do that and come back here.',
+  'push.blocked':
+    'You blocked Cample notifications in this browser. To turn them back on you have to allow them in the browser settings.',
+
   'phonePrompt.title': 'Add your phone number',
   'phonePrompt.text':
     'With your phone number, your family can find you on Cample straight from the contacts on their phone, without having to ask you for your username. Nobody sees your number: it is stored encrypted, just like your ID.',

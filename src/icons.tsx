@@ -18,6 +18,7 @@
  */
 import { MorphIcon } from 'morphicons/react'
 import {
+  Bell,
   BookUser,
   Boxes,
   Bug,
@@ -94,6 +95,7 @@ export const ICON = {
   fallo: Bug,
   agenda: BookUser,
   privacidad: Lock,
+  campana: Bell,
   // Guía de bienvenida
   apuntar: NotebookPen,
   unidades: Boxes,

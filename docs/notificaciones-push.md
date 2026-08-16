@@ -1,97 +1,125 @@
-# Avisos al móvil (Web Push) — propuesto, no hecho
+# Avisos al móvil (Web Push) — hecho
 
-> Estado: **idea con plan**. Nada de esto está implementado. Este documento existe para no tener
-> que volver a pensarlo desde cero.
+> Estado: **funcionando**. Este documento cuenta cómo está montado y, sobre todo, por qué está
+> montado así: hay dos decisiones que se salen de lo que dice cualquier tutorial.
 
 ## Por qué
 
 Cample tiene un problema de **ocasión**, no de producto: solo hay motivo para abrirla cuando toca
-regalar, y eso son tres o cuatro veces al año por persona. Hoy los avisos (`GET /badges`,
-`notifications`) solo se ven **si alguien abre la app**, y nadie la abre. Es un aviso que llega
-únicamente a quien ya no lo necesita.
+regalar, y eso son tres o cuatro veces al año por persona. Los avisos de dentro de la app
+(`GET /badges`, `notifications`) solo se ven **si alguien la abre**, o sea que llegan justo a quien
+ya no los necesita.
 
-Web Push le da a la app un motivo para acordarse de la persona antes de que la persona se acuerde
-de la app. Es, con diferencia, lo que más cambiaría el uso real.
+⚠️ **Nunca un aviso que hable de reservas** (regla 1). Un push del estilo «alguien ha cogido algo de
+tu lista» sería la peor fuga posible: llega al bolsillo, no se puede retirar y lo lee cualquiera que
+mire la pantalla. Por eso el diseño no tiene lista negra: **solo se empuja lo que alguien ha escrito
+a mano** como texto de push en `notify()`.
 
-Los tres avisos que valen la pena, por orden:
+## Las dos decisiones que se salen de lo normal
 
-1. **«El cumple de Marta es en 10 días.»** El único aviso que convierte a Cample en algo útil sin
-   que nadie tenga que acordarse de nada.
-2. **«Llevas 5 meses sin tocar tu lista y tu cumple es en 3 semanas.»** Ataca directamente el
-   motivo por el que la gente no apunta cosas: nadie se lo pide.
-3. **Avisos que ya existen** y hoy se pierden: solicitud de amistad, mensaje nuevo en una colecta.
+### 1. El cron no vive en Pages
 
-⚠️ **Nunca un aviso que hable de reservas** (regla 1). Un push del estilo «alguien ha cogido algo
-de tu lista» sería la peor fuga posible: llega al bolsillo, no hay forma de retirarlo, y puede
-leerlo cualquiera que mire la pantalla. Los avisos de colecta **jamás** van al dueño del regalo,
-igual que ahora.
+Cloudflare **Pages Functions no soporta cron triggers**: `scheduled()` es de los Workers. La salida
+es un Worker aparte y minúsculo en `cron/`, que se despierta cada hora y llama a
+`POST /api/cron/tick` con una cabecera `X-Cron-Secret`. Toda la lógica sigue en `routes.ts`. El
+Worker va en el plan gratuito y no toca el proyecto de Pages, así que ni la URL ni el binding de D1
+corren riesgo.
 
-## Que encaja en el plan gratuito
+### 2. Los avisos van sin contenido
 
-Web Push **no necesita Durable Objects** (que es lo que dejó fuera el chat en tiempo real). Hace
-falta:
+Cifrar el cuerpo de un push (RFC 8291, `aes128gcm`) es con diferencia lo más difícil de hacer a mano
+en un Worker. No hace falta: **un push puede ir vacío**, y entonces solo necesita la firma VAPID. El
+service worker, al recibirlo, pide el texto a `GET /api/push/pending` con la cookie de sesión (mismo
+origen, así que la cookie viaja).
 
-- Un par de claves **VAPID** (se generan una vez, van como secretos de Pages).
-- Una tabla de suscripciones.
-- Un **Cron Trigger** diario que recorra cumpleaños y listas paradas, y mande lo que toque.
+Ventajas: no hay que cifrar nada, y el texto sale **en el idioma de la persona** en vez de en el de
+quien provocó el aviso. La contrapartida: si el móvil está sin conexión justo en ese momento, el
+aviso llega genérico («Tienes algo nuevo»). Con avisos de cumpleaños, irrelevante.
 
-El envío es un `POST` cifrado al endpoint que da el navegador. Desde un Worker se puede hacer con
-`fetch` y WebCrypto; hay librerías, pero la mayoría asumen Node y no valen tal cual.
+Lo único criptográfico que queda es firmar un JWT ES256 para VAPID (`src/server/push.ts`, ~20 líneas
+de WebCrypto). La clave privada es solo el escalar `d`; las coordenadas `x` e `y` salen de la
+pública, así que como secretos basta con las dos cadenas que da el generador.
 
-## Soporte real
+## Ser pesado es la única forma de estropear esto
 
-- **Android (Chrome)**: funciona, incluso sin instalar la app.
-- **iPhone**: funciona **solo si la app está añadida a la pantalla de inicio** (iOS 16.4+). Esto
-  encaja con `InstallPrompt`, que ya existe: en iPhone, el push es una razón de verdad para
-  instalarla, y merece decirlo en ese modal.
-- **Escritorio**: funciona en Chrome, Edge y Firefox.
+Todo lo demás se puede arreglar; que la familia apague los avisos, no. Por eso el repaso
+(`POST /cron/tick`) es deliberadamente lento:
 
-O sea: hay que pedir el permiso **después** de instalar, no antes, y no dar por hecho que existe.
+- **Como mucho un aviso cada 6 días** por persona (`users.push_last_at`), y en la práctica menos: si
+  ese día no hay nada que contar, no se manda nada.
+- **Cada persona tiene su hueco propio**, un día de la semana y una hora entre las 10 y las 20, que
+  salen de `numeroDe(id + semana)`. Ni todo el mundo a la vez, ni la misma persona siempre a la
+  misma hora, ni nada de madrugada. Como el número depende de la semana, el hueco baila solo.
+- **El mensaje va cambiando**: seis clases de aviso, cada una con su clave en `push_sent` (por año,
+  por mes o por semana). El cumpleaños de un amigo gana siempre porque es el único con fecha; el
+  resto se barajan con la semana para que no salga siempre el mismo.
 
-## Esquema
+Las seis clases: cumple de un amigo (de 12 a 1 días antes, ventana ancha para que quepa el hueco
+semanal), mi propio cumple con la lista casi vacía, novedades de mis amigos, gente que quizá
+conozca, «están mirando tu lista» (mismas cautelas que `GET /me/pulse`: mínimo 3 amigos, nunca un
+número ni quién) y lista vacía o parada.
 
-```sql
-CREATE TABLE IF NOT EXISTS push_subs (
-  id         TEXT PRIMARY KEY,
-  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  endpoint   TEXT NOT NULL UNIQUE,   -- la URL que da el navegador
-  p256dh     TEXT NOT NULL,          -- claves de cifrado del navegador
-  auth       TEXT NOT NULL,
-  created_at INTEGER NOT NULL,
-  failed_at  INTEGER                 -- para limpiar las que devuelven 404/410
-);
-CREATE INDEX IF NOT EXISTS idx_push_user ON push_subs(user_id);
+Los avisos **reactivos** —solicitud de amistad, amistad aceptada, toque, colecta completa, mensajes
+nuevos en una colecta— salen en el momento. El del chat está limitado a **uno por hora y colecta**,
+y su aviso nace marcado como leído para no sumar también en el globito de Inicio.
+
+## Piezas
+
+```
+src/server/push.ts       firma VAPID y envía (aviso vacío); borra las suscripciones muertas
+src/server/avisos.ts     textos del repaso en es/en/fr (los redacta el servidor sin nadie delante)
+src/server/routes.ts     /push/key, /push/subscribe, /push/unsubscribe, /push/state,
+                         /push/pending y /cron/tick
+public/sw.js             `push` y `notificationclick` (sigue sin cachear NADA)
+src/push.ts              activar/desactivar desde el navegador
+src/AvisosPrompt.tsx     la pantalla propia que explica los avisos antes del cuadro del sistema
+cron/                    el Worker que despierta el repaso
 ```
 
-Una persona puede tener varias (móvil y ordenador), de ahí el `id` propio en vez de la clave por
-usuario.
+Tablas: `push_subs` (una fila por aparato), `push_sent` (qué avisos del repaso ya se mandaron),
+`users.push_lang` y `users.push_last_at`, y en `notifications` las columnas `push_state` (0 no se
+empuja, 1 empujado sin recoger, 2 recogido) y `push_body`.
 
-## Pasos
+## Pedir el permiso
 
-1. `POST /push/subscribe` y `DELETE /push/subscribe`, más un interruptor en Ajustes. **Con
-   interruptor desde el primer día**: un aviso que no se puede apagar se apaga desinstalando.
-2. `public/sw.js` deja de estar vacío: se le añaden `push` y `notificationclick`. Ojo con la nota
-   del `CLAUDE.md` — **ahí no se cachea nada**, y eso sigue igual.
-3. Envío desde el Worker (VAPID + cifrado del cuerpo).
-4. Cron diario: cumpleaños a 10 días y listas paradas. Una tabla o columna de «ya avisado» para no
-   repetir el mismo aviso cada día — es el fallo clásico de esto.
-5. Enganchar los avisos que ya existen (`notify()`), pero **filtrando por tipo**: hoy `notify()`
-   se usa también para cosas que no deben salir del móvil (todo lo de colectas hacia el dueño no
-   se genera nunca, pero conviene una lista explícita de tipos que sí se empujan, no al revés).
+**El navegador solo lo pregunta una vez en la vida.** Si la persona dice que no, no hay vuelta atrás
+desde la app. Por eso:
 
-## Trampas conocidas
+- Nunca se pide al entrar. Primero sale `AvisosPrompt`, que explica qué avisos va a recibir y que
+  como mucho es uno a la semana; el cuadro del sistema solo aparece si dice que sí.
+- Va el último de la cola de ventanas: guía → teléfono → instalar → avisos.
+- **En iPhone solo funciona con la app añadida a la pantalla de inicio** (iOS 16.4+), así que allí no
+  se ofrece hasta que está instalada.
+- Hay interruptor en Ajustes desde el primer día. Al cerrar sesión se apaga la suscripción de ese
+  aparato (tablet compartida de casa).
 
-- **Idioma**: las notificaciones ya se guardan redactadas (ver `CLAUDE.md`), así que el push
-  heredará ese problema. Para los avisos del cron, que se generan en el servidor sin nadie
-  delante, hay que decidir el idioma por persona: haría falta guardar `users.lang`, que hoy no
-  existe (el idioma vive en `localStorage`).
-- **Endpoints muertos**: un 404 o 410 al enviar significa que esa suscripción ya no vale y hay que
-  borrarla. Si no se limpian, la tabla crece y el cron se hace lento.
-- **No pedir el permiso al entrar**. Si se pide de golpe, la gente dice que no y ya no hay vuelta
-  atrás: el navegador no lo vuelve a preguntar. Pedirlo cuando tenga sentido (justo después de
-  instalar, o al abrir una colecta).
+## Secretos
+
+`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` y `CRON_SECRET`, en Pages y en `.dev.vars`.
+Copia en `secrets.local.txt` (fuera de git).
+
+⚠️ Si se pierde `VAPID_PRIVATE_KEY`, **todas las suscripciones dejan de valer** y hay que volver a
+pedir el permiso a todo el mundo, que es justo lo que solo se puede hacer una vez. `CRON_SECRET`
+tiene que ser el mismo en Pages y en el Worker de `cron/`. Sin claves puestas, el push no existe y
+la app no lo ofrece en ningún sitio: nada revienta.
+
+## Probarlo
+
+No se puede probar del todo en local: el navegador exige HTTPS (salvo `localhost`) y los endpoints
+de push son externos. El orden cómodo es Chrome de escritorio (se comporta como Android y tiene
+`Application → Service Workers → Push` para disparar uno a mano), luego un Android, y el iPhone el
+último — acordándose de instalarla antes o parecerá que está roto.
+
+Para forzar el repaso sin esperar al hueco:
+
+```bash
+curl -X POST https://cample.pages.dev/api/cron/tick -H "X-Cron-Secret: <el secreto>"
+```
+
+Responde `{ ok, sent, candidates }`. Si `sent` es 0 casi siempre, es que está funcionando: la
+mayoría de las horas no le toca a nadie.
 
 ## Alternativa descartada
 
-Un correo o un SMS: no hay email en todo el sistema **a propósito** (ver `CLAUDE.md`) y el SMS
-cuesta dinero. El push es gratis y no añade superficie de ataque remota.
+Un correo o un SMS: no hay email en todo el sistema **a propósito** (ver `CLAUDE.md`) y el SMS cuesta
+dinero. El push es gratis y no añade superficie de ataque remota.

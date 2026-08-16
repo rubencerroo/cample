@@ -4,12 +4,19 @@ import { randomId, sha256, hmac, hashPassword, verifyPassword, timingSafeEqual }
 import { normalizePhone } from './phone'
 import { normalizeUrl, unfurl } from './unfurl'
 import { translateError } from './messages'
+import { textoAviso } from './avisos'
+import { enviarPush, pushConfigurado } from './push'
 
 export type Env = {
   DB: D1Database
   DNI_PEPPER: string
   SESSION_PEPPER: string
   ADMIN_USERNAMES?: string // separados por comas; se marcan como admin al registrarse
+  // Avisos al móvil. Si faltan, el push simplemente no existe y no se le ofrece a nadie.
+  VAPID_PUBLIC_KEY?: string
+  VAPID_PRIVATE_KEY?: string
+  VAPID_SUBJECT?: string
+  CRON_SECRET?: string // lo manda el Worker que despierta el repaso (Pages no tiene cron)
 }
 
 type Vars = { userId: string }
@@ -47,12 +54,31 @@ async function rateLimit(env: Env, key: string, max: number, windowSec: number) 
   return true
 }
 
-async function notify(env: Env, userId: string, kind: string, body: string, link?: string) {
+/**
+ * Guarda un aviso dentro de la app y, **solo si se le pasa `push`**, lo manda además al móvil.
+ *
+ * La lista de lo que sale del móvil es explícita a propósito: no hay ninguna lista negra que se
+ * pueda olvidar de actualizar. Un aviso nuevo no se empuja hasta que alguien escriba aquí su texto,
+ * que es justo el momento de pararse a pensar si eso puede leerse en una pantalla de bloqueo.
+ *
+ * ⚠️ **Ningún texto de push puede hablar de reservas ni de colectas del dueño** (regla 1): llega al
+ * bolsillo, lo ve quien esté al lado y no se puede retirar.
+ */
+async function notify(
+  env: Env,
+  userId: string,
+  kind: string,
+  body: string,
+  link?: string,
+  push?: string,
+) {
   await env.DB.prepare(
-    'INSERT INTO notifications (id, user_id, kind, body, link, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO notifications (id, user_id, kind, body, link, created_at, push_state, push_body) ' +
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
   )
-    .bind(randomId(8), userId, kind, body, link ?? null, now())
+    .bind(randomId(8), userId, kind, body, link ?? null, now(), push ? 1 : 0, push ?? null)
     .run()
+  if (push) await enviarPush(env, userId)
 }
 
 async function areFriends(env: Env, a: string, b: string) {
@@ -143,7 +169,8 @@ async function aceptarInvitacion(c: Ctx, code: string, nuevo: string) {
   const u = await c.env.DB.prepare('SELECT display_name FROM users WHERE id = ?')
     .bind(nuevo)
     .first<{ display_name: string }>()
-  await notify(c.env, inv.user_id, 'friend_accept', `${u?.display_name ?? 'Alguien'} ya está en Cample`, '/amigos')
+  const yaEsta = `${u?.display_name ?? 'Alguien'} ya está en Cample`
+  await notify(c.env, inv.user_id, 'friend_accept', yaEsta, '/amigos', yaEsta)
 }
 
 /* --------------------------- sesión y protección --------------------------- */
@@ -1094,6 +1121,7 @@ app.post('/friends/:username/request', auth, async (c) => {
     'friend_request',
     `${meUser.display_name} quiere ser tu amigo`,
     '/amigos',
+    `${meUser.display_name} quiere ser tu amigo`,
   )
   return c.json({ relation: 'requested' })
 })
@@ -1112,7 +1140,8 @@ async function acceptRequest(c: Ctx, fromId: string, toId: string) {
     ),
   ])
   const to = await c.env.DB.prepare('SELECT display_name FROM users WHERE id = ?').bind(toId).first<any>()
-  await notify(c.env, fromId, 'friend_accept', `${to.display_name} ha aceptado tu solicitud`, '/amigos')
+  const aceptada = `${to.display_name} ha aceptado tu solicitud`
+  await notify(c.env, fromId, 'friend_accept', aceptada, '/amigos', aceptada)
   return 'friends'
 }
 
@@ -1934,12 +1963,19 @@ async function groupPayload(c: Ctx, group: any, gift: any, withMessages: boolean
   }
 }
 
-async function notifyGroup(c: Ctx, groupId: string, body: string, exceptUserId?: string) {
+async function notifyGroup(
+  c: Ctx,
+  groupId: string,
+  body: string,
+  exceptUserId?: string,
+  push?: string,
+) {
   const { results } = await c.env.DB.prepare('SELECT user_id FROM group_members WHERE group_id = ?')
     .bind(groupId)
     .all<{ user_id: string }>()
   for (const m of results)
-    if (m.user_id !== exceptUserId) await notify(c.env, m.user_id, 'group', body, `/colecta/${groupId}`)
+    if (m.user_id !== exceptUserId)
+      await notify(c.env, m.user_id, 'group', body, `/colecta/${groupId}`, push)
 }
 
 app.post('/gifts/:id/group', auth, async (c) => {
@@ -2093,7 +2129,13 @@ app.patch('/groups/:id', auth, async (c) => {
     )
     .run()
   if (status !== g.status && status === 'bought')
-    await notifyGroup(c, g.id, 'La colecta está completa: el regalo ya está comprado 🎉', c.get('userId'))
+    await notifyGroup(
+      c,
+      g.id,
+      'La colecta está completa: el regalo ya está comprado 🎉',
+      c.get('userId'),
+      'La colecta está completa: el regalo ya está comprado 🎉',
+    )
   return c.json({ ok: true })
 })
 
@@ -2129,6 +2171,34 @@ app.post('/groups/:id/messages', auth, async (c) => {
   )
     .bind(randomId(8), acc.group.id, c.get('userId'), text, now())
     .run()
+
+  // Aviso al móvil de los demás, **como mucho uno por hora y colecta**: una conversación viva no
+  // puede convertirse en veinte vibraciones. El aviso queda marcado como leído a propósito, para
+  // que no sume también en el globito de Inicio: el de la pestaña de reservas ya cuenta los
+  // mensajes sin leer y ese es el bueno. El dueño del regalo no es miembro nunca (`groupAccess`).
+  const { results: miembros } = await c.env.DB.prepare(
+    'SELECT user_id FROM group_members WHERE group_id = ? AND user_id != ?',
+  )
+    .bind(acc.group.id, c.get('userId'))
+    .all<{ user_id: string }>()
+  for (const m of miembros) {
+    if (!(await rateLimit(c.env, `pushg:${m.user_id}:${acc.group.id}`, 1, 3600))) continue
+    await c.env.DB.prepare(
+      'INSERT INTO notifications (id, user_id, kind, body, link, is_read, created_at, push_state, push_body) ' +
+        'VALUES (?, ?, ?, ?, ?, 1, ?, 1, ?)',
+    )
+      .bind(
+        randomId(8),
+        m.user_id,
+        'group',
+        'Hay mensajes nuevos en la colecta',
+        `/colecta/${acc.group.id}`,
+        now(),
+        'Hay mensajes nuevos en la colecta',
+      )
+      .run()
+    await enviarPush(c.env, m.user_id)
+  }
   return c.json({ ok: true })
 })
 
@@ -2280,6 +2350,7 @@ app.post('/nudge/:username', auth, async (c) => {
     'nudge',
     `${yo.display_name} te pide que apuntes algo en tu lista`,
     '/mi-lista',
+    `${yo.display_name} te pide que apuntes algo en tu lista`,
   )
   return c.json({ ok: true })
 })
@@ -2317,6 +2388,304 @@ app.post('/notifications/read', auth, async (c) => {
     .bind(c.get('userId'))
     .run()
   return c.json({ ok: true })
+})
+
+/* ---------------------------- avisos al móvil ----------------------------- */
+
+/**
+ * Web Push. Lo que sale de aquí llega al bolsillo de alguien, así que el criterio es al revés que
+ * en el resto de la app: **por defecto no se empuja nada**, y solo viaja lo que alguien ha escrito
+ * a mano como `push_body` en `notify()`.
+ *
+ * El aviso se manda **sin contenido** (ver `push.ts`) y es el service worker el que viene a buscar
+ * el texto aquí con la cookie de sesión. Así no hay que cifrar nada y el texto sale en el idioma
+ * de la persona.
+ */
+
+// La clave pública de VAPID, que el navegador necesita para suscribirse. Sin claves puestas se
+// devuelve vacía y la app no ofrece los avisos en ningún sitio.
+app.get('/push/key', (c) => c.json({ key: c.env.VAPID_PUBLIC_KEY ?? null }))
+
+app.post('/push/subscribe', auth, async (c) => {
+  const b = await c.req.json().catch(() => ({}))
+  const endpoint = String(b.endpoint ?? '')
+  const p256dh = String(b.p256dh ?? '')
+  const auth_ = String(b.auth ?? '')
+  const lang = String(b.lang ?? 'es').slice(0, 2).toLowerCase()
+  if (!/^https:\/\//.test(endpoint) || !p256dh || !auth_)
+    return c.json({ error: 'No se ha podido activar los avisos' }, 400)
+
+  // El mismo aparato puede volver a suscribirse (el navegador renueva la dirección de vez en
+  // cuando): se reemplaza en vez de acumular filas muertas.
+  await c.env.DB.prepare(
+    'INSERT INTO push_subs (id, user_id, endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?, ?) ' +
+      'ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, ' +
+      'auth = excluded.auth, created_at = excluded.created_at',
+  )
+    .bind(randomId(8), c.get('userId'), endpoint, p256dh, auth_, now())
+    .run()
+  // El repaso semanal lo redacta el servidor sin nadie delante: necesita saber en qué idioma.
+  await c.env.DB.prepare('UPDATE users SET push_lang = ? WHERE id = ?')
+    .bind(['es', 'en', 'fr'].includes(lang) ? lang : 'es', c.get('userId'))
+    .run()
+  return c.json({ ok: true })
+})
+
+app.post('/push/unsubscribe', auth, async (c) => {
+  const b = await c.req.json().catch(() => ({}))
+  const endpoint = String(b.endpoint ?? '')
+  if (endpoint) {
+    await c.env.DB.prepare('DELETE FROM push_subs WHERE endpoint = ? AND user_id = ?')
+      .bind(endpoint, c.get('userId'))
+      .run()
+  } else {
+    await c.env.DB.prepare('DELETE FROM push_subs WHERE user_id = ?').bind(c.get('userId')).run()
+  }
+  return c.json({ ok: true })
+})
+
+app.get('/push/state', auth, async (c) => {
+  const r = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM push_subs WHERE user_id = ?')
+    .bind(c.get('userId'))
+    .first<{ n: number }>()
+  return c.json({ enabled: (r?.n ?? 0) > 0, available: pushConfigurado(c.env) })
+})
+
+/**
+ * El texto del aviso que acaba de llegar. Lo pide el service worker nada más recibir el push.
+ * Devuelve el más reciente sin recoger y da por recogidos todos los demás, para que un aparato que
+ * estaba apagado no acabe enseñando cinco avisos viejos de golpe.
+ */
+app.get('/push/pending', auth, async (c) => {
+  const me = c.get('userId')
+  const n = await c.env.DB.prepare(
+    'SELECT body, push_body, link FROM notifications WHERE user_id = ? AND push_state = 1 ' +
+      'ORDER BY created_at DESC LIMIT 1',
+  )
+    .bind(me)
+    .first<{ body: string; push_body: string | null; link: string | null }>()
+  if (n)
+    await c.env.DB.prepare('UPDATE notifications SET push_state = 2 WHERE user_id = ? AND push_state = 1')
+      .bind(me)
+      .run()
+  const u = await c.env.DB.prepare('SELECT push_lang FROM users WHERE id = ?')
+    .bind(me)
+    .first<{ push_lang: string | null }>()
+  return c.json({
+    body: n?.push_body ?? n?.body ?? textoAviso(u?.push_lang, 'aviso.generico'),
+    link: n?.link ?? '/',
+  })
+})
+
+/* --------------------------- el repaso semanal ---------------------------- */
+
+/**
+ * Los avisos de arriba son **reactivos**: solo llegan si alguien hace algo. El que de verdad ataca
+ * el problema de Cample —se abre cuando toca regalar y no se vuelve a abrir— es este: el servidor
+ * mira de vez en cuando si tiene algo útil que decirle a alguien.
+ *
+ * Las reglas de «no ser pesado», que son la mitad del diseño:
+ *
+ *  - **Como mucho un aviso cada 6 días** por persona (`users.push_last_at`), y en la práctica menos:
+ *    si ese día no hay nada que contar, no se manda nada y se espera a la semana siguiente.
+ *  - **Cada persona tiene su propio hueco**, un día de la semana y una hora entre las 10 y las 20,
+ *    que salen de un número derivado de su id y de la semana en curso. O sea: ni todo el mundo a la
+ *    vez, ni la misma persona siempre a la misma hora, ni nada a las tres de la mañana.
+ *  - **El mensaje va cambiando.** Hay seis clases de aviso; el del cumpleaños de un amigo manda
+ *    siempre porque es el único con fecha, y el resto se barajan cada semana. Cada uno lleva su
+ *    clave en `push_sent` (por año, por mes o por semana según lo que sea) para no repetirse.
+ *
+ * ⚠️ Aquí no se consulta `reservations` ni se cuenta nada de colectas: son avisos que llegan a una
+ * pantalla de bloqueo (regla 1).
+ */
+
+/** Número estable a partir de un texto (FNV-1a). No es criptografía: solo reparte huecos. */
+function numeroDe(s: string): number {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 16777619) >>> 0
+  }
+  return h
+}
+
+/** Fecha y hora en España, que es donde vive la gente que usa esto. */
+function ahoraEnEspana() {
+  const partes = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Madrid',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date())
+  const p: Record<string, string> = {}
+  for (const x of partes) p[x.type] = x.value
+  return { y: Number(p.year), m: Number(p.month), d: Number(p.day), hora: Number(p.hour) % 24 }
+}
+
+function diasHastaCumple(bd: string, hoy: { y: number; m: number; d: number }): number | null {
+  const mm = bd.match(/^(\d{2})-(\d{2})$/)
+  if (!mm) return null
+  const base = Date.UTC(hoy.y, hoy.m - 1, hoy.d)
+  let objetivo = Date.UTC(hoy.y, Number(mm[2]) - 1, Number(mm[1]))
+  if (objetivo < base) objetivo = Date.UTC(hoy.y + 1, Number(mm[2]) - 1, Number(mm[1]))
+  return Math.round((objetivo - base) / 86400000)
+}
+
+type Candidato = { clave: string; texto: string; link: string }
+
+/** Qué contarle hoy a esta persona, o nada. El cumpleaños de un amigo gana siempre. */
+async function elegirAviso(env: Env, u: any, hoy: ReturnType<typeof ahoraEnEspana>, semana: number) {
+  const lang = u.push_lang
+  const t = now()
+
+  const yaMandado = async (clave: string) =>
+    !!(await env.DB.prepare('SELECT 1 AS ok FROM push_sent WHERE user_id = ? AND key = ?')
+      .bind(u.id, clave)
+      .first())
+
+  // 1. El cumpleaños de un amigo. Es el único aviso con fecha, así que se mira en una ventana
+  //    ancha (de 12 a 1 días antes): el hueco semanal de cada persona caerá dentro seguro.
+  const { results: amigos } = await env.DB.prepare(
+    `SELECT u2.id, u2.username, u2.display_name, u2.birthday
+       FROM friendships f
+       JOIN users u2 ON u2.id = CASE WHEN f.user_a = ?1 THEN f.user_b ELSE f.user_a END
+      WHERE (f.user_a = ?1 OR f.user_b = ?1) AND u2.is_active = 1 AND u2.birthday IS NOT NULL`,
+  )
+    .bind(u.id)
+    .all<any>()
+
+  let mejor: { dias: number; a: any } | null = null
+  for (const a of amigos) {
+    const dias = diasHastaCumple(a.birthday, hoy)
+    if (dias === null || dias < 1 || dias > 12) continue
+    if (!mejor || dias < mejor.dias) mejor = { dias, a }
+  }
+  if (mejor) {
+    const clave = `cumple:${mejor.a.id}:${hoy.y}`
+    if (!(await yaMandado(clave)))
+      return {
+        clave,
+        texto: textoAviso(lang, mejor.dias === 1 ? 'aviso.cumpleManana' : 'aviso.cumple', {
+          nombre: mejor.a.display_name,
+          dias: mejor.dias,
+        }),
+        link: `/lista/${mejor.a.username}`,
+      }
+  }
+
+  // 2. Todo lo demás sale de un puñado de contadores; se piden de una vez.
+  const r = await env.DB.prepare(
+    `SELECT
+       (SELECT COUNT(*) FROM gifts WHERE user_id = ?1 AND is_archived = 0 AND is_received = 0) AS mios,
+       (SELECT MAX(created_at) FROM gifts WHERE user_id = ?1) AS ultimo,
+       (SELECT COUNT(*) FROM friendships WHERE user_a = ?1 OR user_b = ?1) AS amigos,
+       (SELECT COUNT(DISTINCT viewer_id) FROM list_views WHERE owner_id = ?1 AND day >= ?2) AS visitas,
+       (SELECT COUNT(*) FROM gifts g JOIN users u ON u.id = g.user_id
+         WHERE g.created_at >= ?3 AND g.is_archived = 0 AND g.is_received = 0 AND u.is_active = 1
+           AND g.user_id IN (SELECT CASE WHEN user_a = ?1 THEN user_b ELSE user_a END
+                               FROM friendships WHERE user_a = ?1 OR user_b = ?1)
+           AND ${VISIBLE_SQL}) AS nuevos,
+       (SELECT COUNT(*) FROM (
+          SELECT DISTINCT CASE WHEN f2.user_a = a.id THEN f2.user_b ELSE f2.user_a END AS cand
+            FROM (SELECT CASE WHEN user_a = ?1 THEN user_b ELSE user_a END AS id
+                    FROM friendships WHERE user_a = ?1 OR user_b = ?1) a
+            JOIN friendships f2 ON f2.user_a = a.id OR f2.user_b = a.id)
+         WHERE cand != ?1
+           AND cand NOT IN (SELECT CASE WHEN user_a = ?1 THEN user_b ELSE user_a END
+                              FROM friendships WHERE user_a = ?1 OR user_b = ?1)
+           AND cand NOT IN (SELECT to_id FROM friend_requests WHERE from_id = ?1)
+           AND cand NOT IN (SELECT from_id FROM friend_requests WHERE to_id = ?1)) AS sugerencias`,
+  )
+    .bind(u.id, Math.floor(t / 86400) - 30, t - 12 * 86400)
+    .first<any>()
+
+  const mes = `${hoy.y}-${String(hoy.m).padStart(2, '0')}`
+  const posibles: Candidato[] = []
+
+  // Mi propio cumpleaños encima y la lista vacía: es cuando más duele no tener nada apuntado.
+  const miCumple = u.birthday ? diasHastaCumple(u.birthday, hoy) : null
+  if (miCumple !== null && miCumple >= 5 && miCumple <= 21 && (r?.mios ?? 0) < 3)
+    posibles.push({
+      clave: `micumple:${hoy.y}`,
+      texto: textoAviso(lang, 'aviso.miCumple', { dias: miCumple }),
+      link: '/mi-lista',
+    })
+
+  if ((r?.nuevos ?? 0) >= 3)
+    posibles.push({
+      clave: `novedades:${semana}`,
+      texto: textoAviso(lang, 'aviso.novedades', { n: r.nuevos }),
+      link: '/',
+    })
+
+  if ((r?.sugerencias ?? 0) >= 3)
+    posibles.push({ clave: `sugerencias:${mes}`, texto: textoAviso(lang, 'aviso.sugerencias'), link: '/amigos' })
+
+  // El pulso: alguien ha entrado en mi lista. Un rango, nunca un número, y nunca quién — las
+  // mismas cautelas que `GET /me/pulse`, incluido el mínimo de 3 amigos.
+  if ((r?.amigos ?? 0) >= 3 && (r?.visitas ?? 0) > 0 && (r?.mios ?? 0) < 5)
+    posibles.push({ clave: `pulso:${mes}`, texto: textoAviso(lang, 'aviso.pulso'), link: '/mi-lista' })
+
+  if ((r?.mios ?? 0) === 0)
+    posibles.push({ clave: `listavacia:${mes}`, texto: textoAviso(lang, 'aviso.listaVacia'), link: '/mi-lista' })
+  else if ((r?.mios ?? 0) < 3 && (r?.ultimo ?? 0) < t - 120 * 86400)
+    posibles.push({ clave: `listaparada:${mes}`, texto: textoAviso(lang, 'aviso.listaParada'), link: '/mi-lista' })
+
+  // Se barajan con la semana, para que no salga siempre el mismo por estar antes en la lista.
+  posibles.sort((a, b) => numeroDe(u.id + semana + a.clave) - numeroDe(u.id + semana + b.clave))
+  for (const p of posibles) if (!(await yaMandado(p.clave))) return p
+  return null
+}
+
+/**
+ * Lo despierta un Worker aparte una vez por hora, porque **Pages Functions no tiene cron**
+ * (`scheduled()` es cosa de los Workers). Ver `cron/` y `docs/notificaciones-push.md`.
+ */
+app.post('/cron/tick', async (c) => {
+  const secreto = c.env.CRON_SECRET
+  const dado = c.req.header('X-Cron-Secret') ?? ''
+  // Sin secreto configurado esta ruta no existe: nadie debe poder disparar avisos desde fuera.
+  if (!secreto || !timingSafeEqual(dado, secreto)) return c.json({ error: 'No encontrado' }, 404)
+  if (!pushConfigurado(c.env)) return c.json({ ok: true, sent: 0, skipped: 'sin claves' })
+
+  const hoy = ahoraEnEspana()
+  // Ni de madrugada ni a la hora de comer: el aviso tiene que caer en un momento cómodo.
+  if (hoy.hora < 10 || hoy.hora > 20) return c.json({ ok: true, sent: 0, skipped: 'hora' })
+
+  const t = now()
+  const dia = Math.floor(t / 86400)
+  const semana = Math.floor(dia / 7)
+  const diaDeLaSemana = dia % 7
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT u.id, u.birthday, u.push_lang FROM users u
+      WHERE u.is_active = 1 AND u.push_last_at < ?1
+        AND EXISTS (SELECT 1 FROM push_subs s WHERE s.user_id = u.id)`,
+  )
+    .bind(t - 6 * 86400)
+    .all<any>()
+
+  let enviados = 0
+  for (const u of results) {
+    // El hueco de cada persona esta semana: su día y su hora, distintos de los de los demás y
+    // distintos de los suyos de la semana pasada.
+    const n = numeroDe(`${u.id}:${semana}`)
+    if (n % 7 !== diaDeLaSemana) continue
+    if (10 + ((n >>> 3) % 11) !== hoy.hora) continue
+
+    const aviso = await elegirAviso(c.env, u, hoy, semana)
+    if (!aviso) continue
+
+    await c.env.DB.prepare('INSERT OR IGNORE INTO push_sent (user_id, key, at) VALUES (?, ?, ?)')
+      .bind(u.id, aviso.clave, t)
+      .run()
+    await c.env.DB.prepare('UPDATE users SET push_last_at = ? WHERE id = ?').bind(t, u.id).run()
+    await notify(c.env, u.id, 'repaso', aviso.texto, aviso.link, aviso.texto)
+    enviados++
+  }
+  return c.json({ ok: true, sent: enviados, candidates: results.length })
 })
 
 app.onError((err, c) => {

@@ -279,6 +279,14 @@ export const api = {
   sendMessage: (id: string, text: string) =>
     req(`/groups/${id}/messages`, { method: 'POST', ...body({ body: text }) }),
 
+  // Avisos al móvil. `pushKey` devuelve null si el servidor no tiene claves puestas.
+  pushKey: () => req<{ key: string | null }>('/push/key'),
+  pushState: () => req<{ enabled: boolean; available: boolean }>('/push/state'),
+  subscribePush: (d: { endpoint: string; p256dh: string; auth: string; lang: string }) =>
+    req('/push/subscribe', { method: 'POST', ...body(d) }),
+  unsubscribePush: (endpoint?: string) =>
+    req('/push/unsubscribe', { method: 'POST', ...body({ endpoint }) }),
+
   badges: () =>
     req<{ badges: { home: number; friends: number; reservations: number; admin: number } }>('/badges'),
   notifications: () =>

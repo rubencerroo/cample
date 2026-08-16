@@ -1,0 +1,21 @@
+# Worker minúsculo cuyo único trabajo es despertar el repaso de avisos de Cample.
+#
+# Existe porque **Cloudflare Pages Functions no soporta cron triggers** (`scheduled()` es cosa de
+# los Workers). Toda la lógica sigue viviendo en `src/server/routes.ts`; esto solo llama a la ruta.
+#
+# Se despliega aparte, desde esta carpeta:
+#   cd cron && npx wrangler deploy
+#   npx wrangler secret put CRON_SECRET     (el mismo que el de Pages)
+#
+# No toca el proyecto de Pages: ni la URL ni el binding de D1 corren ningún riesgo.
+name = "cample-cron"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[triggers]
+# Cada hora, en el minuto 7 (no en punto, que es cuando se amontona medio mundo). Quién recibe algo
+# y a qué hora lo decide el propio repaso: cada persona tiene su hueco. Ver `/cron/tick`.
+crons = ["7 * * * *"]
+
+[vars]
+CAMPLE_URL = "https://cample.pages.dev/api/cron/tick"

@@ -351,6 +351,23 @@ export const fr: Dict = {
   'install.ios2': '2. Descends et choisis « Sur l\'écran d\'accueil ».',
   'install.later': 'Pas maintenant',
 
+  'push.title': 'Laisse Cample te prévenir',
+  'push.text': "Un message sur ton téléphone quand il y a vraiment quelque chose à faire.",
+  'push.item1': "Quand l'anniversaire de quelqu'un approche.",
+  'push.item2': "Quand quelqu'un veut t'ajouter.",
+  'push.item3': 'Quand il se passe quelque chose dans une de tes cagnottes.',
+  'push.calm': 'Au maximum un par semaine, jamais la nuit. Tu peux les couper quand tu veux.',
+  'push.enable': 'Oui, préviens-moi',
+  'push.later': 'Pas maintenant',
+  'push.disable': 'Couper les avis',
+  'push.settingsTitle': 'Avis sur le téléphone',
+  'push.settingsSummary': 'Anniversaires et nouveautés',
+  'push.unsupported': "Ce navigateur ne peut pas envoyer d'avis.",
+  'push.iosNeedsInstall':
+    "Sur iPhone, les avis ne marchent que si tu ajoutes Cample à l'écran d'accueil. Fais-le et reviens ici.",
+  'push.blocked':
+    'Tu as bloqué les avis de Cample dans ce navigateur. Pour les réactiver, il faut les autoriser dans les réglages du navigateur.',
+
   'phonePrompt.title': 'Ajoute ton téléphone',
   'phonePrompt.text':
     "Avec ton numéro, ta famille te trouve sur Cample directement depuis les contacts de son téléphone, sans avoir à te demander ton nom d'utilisateur. Personne ne voit ton numéro : il est stocké chiffré, comme la pièce d'identité.",

@@ -345,6 +345,23 @@ export const es = {
   'install.ios2': '2. Baja y elige «Añadir a pantalla de inicio».',
   'install.later': 'Ahora no',
 
+  'push.title': 'Que Cample te avise',
+  'push.text': 'Un aviso en el móvil cuando de verdad hay algo que hacer.',
+  'push.item1': 'Cuando se acerca el cumple de alguien de tu gente.',
+  'push.item2': 'Cuando alguien quiere agregarte.',
+  'push.item3': 'Cuando hay movimiento en una colecta tuya.',
+  'push.calm': 'Como mucho un aviso a la semana, y nunca de madrugada. Se apaga cuando quieras.',
+  'push.enable': 'Sí, avísame',
+  'push.later': 'Ahora no',
+  'push.disable': 'Apagar los avisos',
+  'push.settingsTitle': 'Avisos en el móvil',
+  'push.settingsSummary': 'Cumpleaños y novedades',
+  'push.unsupported': 'Este navegador no puede mandar avisos.',
+  'push.iosNeedsInstall':
+    'En iPhone los avisos solo funcionan si añades Cample a la pantalla de inicio. Hazlo y vuelve aquí.',
+  'push.blocked':
+    'Bloqueaste los avisos de Cample en este navegador. Para volver a activarlos hay que permitirlos en los ajustes del navegador.',
+
   'phonePrompt.title': 'Añade tu teléfono',
   'phonePrompt.text':
     'Con tu teléfono, tu familia te encuentra en Cample directamente desde la agenda de su móvil, sin tener que preguntarte tu usuario. Nadie ve tu número: se guarda cifrado, igual que el DNI.',
