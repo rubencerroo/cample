@@ -1,7 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, Gift } from '../api'
-import { Avatar, Empty, ErrorBox, Reacciones, Spinner, VisibilityChip, money, useAsync, useDialogos } from '../ui'
+import {
+  Avatar,
+  Empty,
+  ErrorBox,
+  Reacciones,
+  Spinner,
+  VisibilityChip,
+  fileToGiftImageDataUrl,
+  giftImageSrc,
+  money,
+  useAsync,
+  useDialogos,
+} from '../ui'
 import { useAuth } from '../App'
 import { getLang, translate, useT } from '../i18n'
 import { ICON, Icon } from '../icons'
@@ -82,8 +94,8 @@ export default function MyList() {
           {list.data.gifts.map((g) => (
             <li key={g.id} className={`card ${g.isReceived ? 'opacity-60' : ''}`}>
               <div className="flex items-start gap-3">
-                {g.imageUrl && (
-                  <img src={g.imageUrl} alt="" className="h-16 w-16 rounded-2xl object-cover" loading="lazy" />
+                {giftImageSrc(g) && (
+                  <img src={giftImageSrc(g)!} alt="" className="h-16 w-16 rounded-2xl object-cover" loading="lazy" />
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -309,6 +321,33 @@ function GiftDialog({
   const [aviso, setAviso] = useState('')
   const t = useT()
 
+  // Foto subida desde la galería. Se manda aparte del regalo (hace falta su id), así que aquí solo
+  // se guarda la intención: una foto nueva por subir, o que hay que quitar la que ya tenía.
+  const [fotoNueva, setFotoNueva] = useState<string | null>(null)
+  const [fotoQuitada, setFotoQuitada] = useState(false)
+  const fotoGuardada = gift?.hasImage && !fotoQuitada ? giftImageSrc(gift) : null
+  const vistaPrevia = fotoNueva ?? fotoGuardada ?? (f.imageUrl || null)
+
+  async function elegirFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      setFotoNueva(await fileToGiftImageDataUrl(file))
+      setFotoQuitada(false)
+      // La subida manda sobre la del enlace; dejar las dos solo despista.
+      setF((prev) => ({ ...prev, imageUrl: '' }))
+    } catch (err: any) {
+      setAviso(err.message)
+    }
+  }
+
+  function quitarFoto() {
+    setFotoNueva(null)
+    setFotoQuitada(true)
+    setF((prev) => ({ ...prev, imageUrl: '' }))
+  }
+
   /**
    * Rellena el regalo a partir del enlace. Lo que ya esté escrito manda: esto solo completa los
    * huecos, para que volver a pulsarlo nunca borre lo que la persona haya cambiado a mano.
@@ -361,8 +400,10 @@ function GiftDialog({
         return
       }
       const payload = { ...f, url: f.url || null, imageUrl: f.imageUrl || null }
-      if (gift) await api.updateGift(gift.id, payload)
-      else await api.createGift(payload)
+      const guardado = gift ? await api.updateGift(gift.id, payload) : await api.createGift(payload)
+      // La foto va después: hasta aquí no se conoce el id de un regalo nuevo.
+      if (fotoNueva) await api.setGiftImage(guardado.gift.id, fotoNueva)
+      else if (fotoQuitada && gift?.hasImage) await api.removeGiftImage(guardado.gift.id)
       onSaved()
     } catch (err: any) {
       setError(err.message)
@@ -415,19 +456,27 @@ function GiftDialog({
           {aviso && <p className="mt-1 text-sm text-slate-500">{aviso}</p>}
         </div>
 
-        {f.imageUrl && (
-          <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
-            <img src={f.imageUrl} alt="" className="h-16 w-16 rounded-2xl object-cover" />
-            <span className="flex-1 text-sm text-slate-600">{t('gift.photoFromLink')}</span>
-            <button
-              type="button"
-              className="btn-ghost !py-2 !px-4 !text-sm"
-              onClick={() => setF({ ...f, imageUrl: '' })}
-            >
-              {t('common.remove')}
-            </button>
-          </div>
-        )}
+        {/* La foto puede venir del enlace o de la galería. Sin enlace, la galería es la única vía. */}
+        <div className="space-y-2 rounded-2xl bg-slate-50 p-3">
+          {vistaPrevia ? (
+            <div className="flex items-center gap-3">
+              <img src={vistaPrevia} alt="" className="h-16 w-16 rounded-2xl object-cover" />
+              <span className="flex-1 text-sm text-slate-600">
+                {f.imageUrl ? t('gift.photoFromLink') : t('gift.photoYours')}
+              </span>
+              <button type="button" className="btn-ghost !py-2 !px-4 !text-sm" onClick={quitarFoto}>
+                {t('common.remove')}
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-600">{t('gift.photoHint')}</p>
+          )}
+          <label className="btn-ghost !py-2 !text-sm inline-flex w-full cursor-pointer items-center justify-center gap-2">
+            <Icon icon={ICON.foto} size={18} />
+            {vistaPrevia ? t('gift.photoChange') : t('gift.photoPick')}
+            <input type="file" accept="image/*" className="hidden" onChange={elegirFoto} />
+          </label>
+        </div>
 
         <div>
           <label className="label" htmlFor="t">{t('gift.what')}</label>

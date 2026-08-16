@@ -42,6 +42,14 @@ CREATE TABLE IF NOT EXISTS invites (
 );
 CREATE INDEX IF NOT EXISTS idx_invites_user ON invites(user_id);
 
+-- Nombres de usuario soltados. Reservan el nombre 14 días para su dueño (regla de Instagram).
+CREATE TABLE IF NOT EXISTS username_history (
+  old_username TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  changed_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_username_history_user ON username_history(user_id, changed_at);
+
 -- Fotos de perfil aparte, para que las consultas de `users` no arrastren los bytes.
 CREATE TABLE IF NOT EXISTS avatars (
   user_id    TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -106,9 +114,19 @@ CREATE TABLE IF NOT EXISTS gifts (
   is_archived INTEGER NOT NULL DEFAULT 0,
   visibility  TEXT NOT NULL DEFAULT 'all',   -- all | only (solo los de gift_audience) | except (todos menos ellos)
   created_at  INTEGER NOT NULL,
-  updated_at  INTEGER NOT NULL
+  updated_at  INTEGER NOT NULL,
+  image_version INTEGER NOT NULL DEFAULT 0,   -- contador que SOLO sube, igual que el de los avatares
+  has_image     INTEGER NOT NULL DEFAULT 0    -- si tiene foto propia subida (aparte de image_url)
 );
 CREATE INDEX IF NOT EXISTS idx_gifts_user ON gifts(user_id, is_archived);
+
+-- Foto propia del regalo. Los bytes aparte, para que ninguna consulta de `gifts` los arrastre.
+CREATE TABLE IF NOT EXISTS gift_images (
+  gift_id    TEXT PRIMARY KEY REFERENCES gifts(id) ON DELETE CASCADE,
+  mime       TEXT NOT NULL,
+  data       BLOB NOT NULL,
+  updated_at INTEGER NOT NULL
+);
 
 -- Personas señaladas de un regalo restringido. Según `gifts.visibility` son las únicas que lo ven
 -- ('only') o las únicas que NO lo ven ('except'). Solo el dueño conoce los nombres.

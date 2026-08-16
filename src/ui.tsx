@@ -38,6 +38,41 @@ export async function fileToAvatarDataUrl(file: File): Promise<string> {
   return canvas.toDataURL('image/jpeg', 0.3)
 }
 
+const GIFT_SIDE = 640
+
+/**
+ * Igual que la del avatar pero sin recortar a cuadrado: un regalo puede ser alargado y cortarlo
+ * dejaría fuera justo lo que se quiere enseñar. Lado mayor a 640px y JPEG.
+ */
+export async function fileToGiftImageDataUrl(file: File): Promise<string> {
+  const source = await decodeImage(file)
+  const w = 'width' in source ? source.width : (source as HTMLImageElement).naturalWidth
+  const h = 'height' in source ? source.height : (source as HTMLImageElement).naturalHeight
+  const escala = Math.min(1, GIFT_SIDE / Math.max(w, h))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(w * escala))
+  canvas.height = Math.max(1, Math.round(h * escala))
+  const ctx = canvas.getContext('2d')!
+  // Los formatos con transparencia quedarían con el fondo negro al pasar a JPEG.
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(source as CanvasImageSource, 0, 0, canvas.width, canvas.height)
+  if ('close' in source) source.close()
+
+  for (const quality of [0.82, 0.7, 0.55, 0.4]) {
+    const dataUrl = canvas.toDataURL('image/jpeg', quality)
+    if (dataUrl.length * 0.75 <= AVATAR_MAX_BYTES) return dataUrl
+  }
+  return canvas.toDataURL('image/jpeg', 0.3)
+}
+
+/** Dirección de la foto de un regalo: la subida manda sobre la del enlace. */
+export function giftImageSrc(g: { id: string; hasImage?: boolean; imageVersion?: number; imageUrl?: string | null }) {
+  if (g.hasImage) return `/api/gift-image/${g.id}?v=${g.imageVersion ?? 0}`
+  return g.imageUrl || null
+}
+
 async function decodeImage(file: File): Promise<ImageBitmap | HTMLImageElement> {
   if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|gif|avif|heic|heif|bmp)$/i.test(file.name))
     throw new Error(tr('image.notAnImage'))

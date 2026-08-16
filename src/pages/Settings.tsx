@@ -2,8 +2,16 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../App'
-import { Avatar, ErrorBox, birthdayLabel, fileToAvatarDataUrl, mascaraCumple, useDialogos } from '../ui'
-import { LANGS, useI18n, useT } from '../i18n'
+import {
+  Avatar,
+  ErrorBox,
+  birthdayLabel,
+  fileToAvatarDataUrl,
+  mascaraCumple,
+  useAsync,
+  useDialogos,
+} from '../ui'
+import { LANGS, localeOf, useI18n, useT } from '../i18n'
 import { ICON, Icon } from '../icons'
 
 export default function Settings() {
@@ -176,6 +184,17 @@ export default function Settings() {
         </Fila>
 
         <Fila
+          id="usuario"
+          abierto={abierto}
+          setAbierto={setAbierto}
+          icono={ICON.persona}
+          titulo={t('settings.username')}
+          resumen={`@${user.username}`}
+        >
+          <CambiarUsuario />
+        </Fila>
+
+        <Fila
           id="telefono"
           abierto={abierto}
           setAbierto={setAbierto}
@@ -342,6 +361,81 @@ export default function Settings() {
 }
 
 /** Un bloque con su rótulo, como las secciones de los ajustes del móvil. */
+/**
+ * Cambiar el nombre de usuario con las reglas de Instagram (2 cada 14 días y el viejo reservado
+ * para ti otros 14). Las cuentas se dan por el nombre, así que conviene que no baile todo el rato.
+ */
+function CambiarUsuario() {
+  const t = useT()
+  const { user, setUser } = useAuth()
+  const estado = useAsync(() => api.usernameStatus(), [])
+  const [nuevo, setNuevo] = useState('')
+  const [error, setError] = useState('')
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    setMsg('')
+    try {
+      const r = await api.setUsername(nuevo)
+      setUser({ ...user, username: r.user.username })
+      setNuevo('')
+      estado.reload()
+      setMsg(t('settings.usernameSaved'))
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const sinCambios = estado.data?.left === 0
+
+  return (
+    <form onSubmit={guardar} className="space-y-4">
+      <ErrorBox>{error}</ErrorBox>
+      {msg && <div className="rounded-2xl bg-green-50 border border-green-200 px-4 py-3 text-green-700">{msg}</div>}
+      <div>
+        <label className="label" htmlFor="un">{t('settings.usernameNew')}</label>
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-semibold text-slate-400">@</span>
+          <input
+            id="un"
+            className="input flex-1"
+            value={nuevo}
+            onChange={(e) => setNuevo(e.target.value.toLowerCase())}
+            placeholder={user.username}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            disabled={sinCambios}
+          />
+        </div>
+        <p className="mt-1.5 text-sm text-slate-500">{t('settings.usernameRules')}</p>
+      </div>
+
+      {estado.data && (
+        <p className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-600">
+          {sinCambios
+            ? t('settings.usernameNoneLeft', {
+                date: estado.data.nextAt
+                  ? new Date(estado.data.nextAt * 1000).toLocaleDateString(localeOf())
+                  : '',
+              })
+            : t('settings.usernameLeft', { n: estado.data.left })}
+        </p>
+      )}
+
+      <button className="btn-primary w-full" disabled={busy || sinCambios || !nuevo.trim()}>
+        {t('common.save')}
+      </button>
+    </form>
+  )
+}
+
 function Grupo({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <section>

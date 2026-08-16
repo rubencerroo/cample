@@ -284,6 +284,10 @@ app.post('/auth/register', async (c) => {
   if (!(await rateLimit(c.env, `reg:${ip}`, 20, 3600)))
     return c.json({ error: 'Demasiadas cuentas nuevas desde aquí. Prueba dentro de un rato.' }, 429)
 
+  // Un nombre recién soltado sigue reservado para su antiguo dueño (ver /me/username).
+  if (await reservaDe(c.env, username))
+    return c.json({ error: 'Ese nombre de usuario ya está cogido' }, 409)
+
   const id = randomId(8)
   const t = now()
   try {
@@ -675,6 +679,7 @@ app.delete('/admin/users/:username', auth, adminOnly, async (c) => {
     c.env.DB.prepare('DELETE FROM gift_audience WHERE user_id = ?1 OR gift_id IN (SELECT id FROM gifts WHERE user_id = ?1)').bind(target.id),
     c.env.DB.prepare('DELETE FROM gift_reactions WHERE user_id = ?1 OR gift_id IN (SELECT id FROM gifts WHERE user_id = ?1)').bind(target.id),
     c.env.DB.prepare('DELETE FROM list_views WHERE owner_id = ?1 OR viewer_id = ?1').bind(target.id),
+    c.env.DB.prepare('DELETE FROM gift_images WHERE gift_id IN (SELECT id FROM gifts WHERE user_id = ?)').bind(target.id),
     c.env.DB.prepare('DELETE FROM gifts WHERE user_id = ?').bind(target.id),
     c.env.DB.prepare('DELETE FROM feedback WHERE user_id = ?').bind(target.id),
     c.env.DB.prepare('DELETE FROM friendships WHERE user_a = ?1 OR user_b = ?1').bind(target.id),
@@ -683,6 +688,7 @@ app.delete('/admin/users/:username', auth, adminOnly, async (c) => {
     c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(target.id),
     c.env.DB.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(target.id),
     c.env.DB.prepare('DELETE FROM signup_signals WHERE user_id = ?').bind(target.id),
+    c.env.DB.prepare('DELETE FROM username_history WHERE user_id = ?').bind(target.id),
     c.env.DB.prepare('DELETE FROM invites WHERE user_id = ?').bind(target.id),
     c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(target.id),
   ])
@@ -700,6 +706,94 @@ app.patch('/me', auth, async (c) => {
     .bind(displayName, bio, birthday, u.id)
     .run()
   return c.json({ user: publicUser({ ...u, display_name: displayName, bio, birthday }) })
+})
+
+/* --------------------- cambiar el nombre de usuario ------------------------ */
+// Copiado de Instagram, que es donde la gente ya ha aprendido cómo funciona esto:
+//  - como mucho 2 cambios cada 14 días, para que un nombre signifique algo y no se pueda usar
+//    para hacerse pasar por otro a base de saltos;
+//  - el nombre que sueltas te queda reservado esos mismos 14 días, así que puedes volver atrás si
+//    te arrepientes y nadie te lo quita mientras tanto;
+//  - y volver a un nombre tuyo reservado no gasta cambio: arreglar una equivocación no se castiga.
+
+const USERNAME_DIAS = 14
+const USERNAME_CAMBIOS = 2
+
+/** Quién tiene reservado ese nombre ahora mismo, o null si está libre. */
+async function reservaDe(env: Env, username: string) {
+  const r = await env.DB.prepare(
+    'SELECT user_id FROM username_history WHERE old_username = ? AND changed_at > ?',
+  )
+    .bind(username, now() - USERNAME_DIAS * 86400)
+    .first<{ user_id: string }>()
+  return r?.user_id ?? null
+}
+
+app.get('/me/username', auth, async (c) => {
+  const desde = now() - USERNAME_DIAS * 86400
+  const r = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n, MIN(changed_at) AS primero FROM username_history WHERE user_id = ? AND changed_at > ?',
+  )
+    .bind(c.get('userId'), desde)
+    .first<{ n: number; primero: number | null }>()
+  const usados = r?.n ?? 0
+  return c.json({
+    left: Math.max(0, USERNAME_CAMBIOS - usados),
+    // Cuándo se libera el hueco más antiguo, para poder decir «podrás volver a cambiarlo el…».
+    nextAt: usados >= USERNAME_CAMBIOS && r?.primero ? r.primero + USERNAME_DIAS * 86400 : null,
+  })
+})
+
+app.post('/me/username', auth, async (c) => {
+  const me = c.get('userId')
+  const b = await c.req.json().catch(() => ({}))
+  const nuevo = String(b.username ?? '').trim().toLowerCase()
+  const actual = await c.env.DB.prepare('SELECT username FROM users WHERE id = ?')
+    .bind(me)
+    .first<{ username: string }>()
+  if (!actual) return c.json({ error: 'No encontrado' }, 404)
+  if (nuevo === actual.username) return c.json({ error: 'Ese ya es tu nombre de usuario' }, 400)
+  if (!/^[a-z0-9._]{3,20}$/.test(nuevo))
+    return c.json({ error: 'El usuario debe tener 3-20 letras, números, punto o guion bajo' }, 400)
+
+  const dueno = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?')
+    .bind(nuevo)
+    .first<{ id: string }>()
+  if (dueno) return c.json({ error: 'Ese nombre de usuario ya está cogido' }, 409)
+
+  // Si lo tiene reservado otra persona, para ella está cogido aunque no lo esté usando.
+  const reservado = await reservaDe(c.env, nuevo)
+  if (reservado && reservado !== me)
+    return c.json({ error: 'Ese nombre de usuario ya está cogido' }, 409)
+
+  // Recuperar un nombre propio es deshacer, no cambiar: no gasta.
+  const esVolverAtras = reservado === me
+  if (!esVolverAtras) {
+    const r = await c.env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM username_history WHERE user_id = ? AND changed_at > ?',
+    )
+      .bind(me, now() - USERNAME_DIAS * 86400)
+      .first<{ n: number }>()
+    if ((r?.n ?? 0) >= USERNAME_CAMBIOS)
+      return c.json(
+        { error: 'Solo puedes cambiar tu nombre de usuario dos veces cada 14 días' },
+        429,
+      )
+  }
+
+  const t = now()
+  await c.env.DB.batch([
+    // El nombre que suelta queda reservado para él; si ya estaba en la tabla, se renueva la fecha.
+    c.env.DB.prepare(
+      'INSERT INTO username_history (old_username, user_id, changed_at) VALUES (?1, ?2, ?3) ' +
+        'ON CONFLICT(old_username) DO UPDATE SET user_id = ?2, changed_at = ?3',
+    ).bind(actual.username, me, t),
+    c.env.DB.prepare('UPDATE users SET username = ? WHERE id = ?').bind(nuevo, me),
+    // El que estrena deja de estar reservado: ya lo está usando.
+    c.env.DB.prepare('DELETE FROM username_history WHERE old_username = ?').bind(nuevo),
+  ])
+  const u = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(me).first()
+  return c.json({ user: publicUser(u) })
 })
 
 /**
@@ -1216,6 +1310,9 @@ const ownerView = (g: any) => ({
   isArchived: !!g.is_archived,
   visibility: (g.visibility ?? 'all') as 'all' | 'only' | 'except',
   createdAt: g.created_at,
+  // Foto propia subida desde la galería. La versión solo sube, así cada foto estrena dirección.
+  hasImage: !!g.has_image,
+  imageVersion: g.image_version ?? 0,
 })
 
 // Las personas señaladas de cada regalo, agrupadas por regalo. SOLO para el dueño.
@@ -1425,8 +1522,91 @@ app.delete('/gifts/:id', auth, async (c) => {
   const g = await ownedGift(c, c.req.param('id')!)
   if (!g) return c.json({ error: 'No encontrado' }, 404)
   await notifyReservers(c, g.id, `Se ha eliminado un regalo que habías reservado: «${g.title}»`)
-  await c.env.DB.prepare('DELETE FROM gifts WHERE id = ?').bind(g.id).run()
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM gift_images WHERE gift_id = ?').bind(g.id),
+    c.env.DB.prepare('DELETE FROM gifts WHERE id = ?').bind(g.id),
+  ])
   return c.json({ ok: true })
+})
+
+/* --------------------------- foto propia del regalo ------------------------ */
+// Para lo que no sale de una tienda: «unos guantes de lana como los de la foto». Mismo camino que
+// los avatares (BLOB aparte + contador de versión), con las mismas trampas de D1.
+
+/** Decodifica un data URL de imagen a ArrayBuffer, que es lo único que admite `bind()`. */
+function imagenDesdeDataUrl(dataUrl: string) {
+  const m = dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/)
+  if (!m) return null
+  const binary = atob(m[2])
+  if (binary.length > MAX_AVATAR_BYTES) return 'grande' as const
+  const buffer = new ArrayBuffer(binary.length)
+  const bytes = new Uint8Array(buffer)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return { mime: m[1], buffer }
+}
+
+app.post('/gifts/:id/image', auth, async (c) => {
+  const g = await ownedGift(c, c.req.param('id')!)
+  if (!g) return c.json({ error: 'No encontrado' }, 404)
+  const b = await c.req.json().catch(() => ({}))
+  const img = imagenDesdeDataUrl(String(b.dataUrl ?? ''))
+  if (img === 'grande') return c.json({ error: 'La foto es demasiado grande' }, 413)
+  if (!img) return c.json({ error: 'Esa imagen no vale. Prueba con otra foto.' }, 400)
+
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      'INSERT INTO gift_images (gift_id, mime, data, updated_at) VALUES (?1, ?2, ?3, ?4) ' +
+        'ON CONFLICT(gift_id) DO UPDATE SET mime = ?2, data = ?3, updated_at = ?4',
+    ).bind(g.id, img.mime, img.buffer, now()),
+    c.env.DB.prepare(
+      'UPDATE gifts SET image_version = image_version + 1, has_image = 1 WHERE id = ?',
+    ).bind(g.id),
+  ])
+  const row = await c.env.DB.prepare('SELECT * FROM gifts WHERE id = ?').bind(g.id).first()
+  return c.json({ gift: ownerView(row) })
+})
+
+app.delete('/gifts/:id/image', auth, async (c) => {
+  const g = await ownedGift(c, c.req.param('id')!)
+  if (!g) return c.json({ error: 'No encontrado' }, 404)
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM gift_images WHERE gift_id = ?').bind(g.id),
+    // La versión sube también al quitarla: si volviera a 0, la siguiente foto reutilizaría una
+    // dirección ya cacheada y se vería la anterior.
+    c.env.DB.prepare(
+      'UPDATE gifts SET image_version = image_version + 1, has_image = 0 WHERE id = ?',
+    ).bind(g.id),
+  ])
+  const row = await c.env.DB.prepare('SELECT * FROM gifts WHERE id = ?').bind(g.id).first()
+  return c.json({ gift: ownerView(row) })
+})
+
+// A diferencia de los avatares, esto sí dice qué ha pedido alguien: se comprueba quién mira.
+app.get('/gift-image/:id', auth, async (c) => {
+  const me = c.get('userId')
+  const g = await c.env.DB.prepare('SELECT id, user_id, visibility FROM gifts WHERE id = ?')
+    .bind(c.req.param('id')!)
+    .first<any>()
+  if (!g) return c.json({ error: 'No encontrado' }, 404)
+  if (g.user_id !== me) {
+    if (!(await areFriends(c.env, me, g.user_id))) return c.json({ error: 'No encontrado' }, 404)
+    if (!(await canSeeGift(c.env, g, me))) return c.json({ error: 'No encontrado' }, 404)
+  }
+  const row = await c.env.DB.prepare('SELECT mime, data FROM gift_images WHERE gift_id = ?')
+    .bind(g.id)
+    .first<{ mime: string; data: ArrayBuffer | number[] }>()
+  if (!row) return c.json({ error: 'Sin foto' }, 404)
+  // D1 devuelve los BLOB como array de números: sin convertirlos, Response los manda como texto.
+  const body = row.data instanceof ArrayBuffer ? row.data : new Uint8Array(row.data)
+  return new Response(body, {
+    headers: {
+      'Content-Type': row.mime,
+      // ⚠️ Sin caché, a diferencia de los avatares. Una cara no es un secreto, pero esto sí dice
+      // qué ha pedido alguien: en la tablet compartida de casa, la caché se la queda el navegador
+      // y la siguiente persona que entre podría sacarla aunque el servidor le diga que no.
+      'Cache-Control': 'private, no-store',
+    },
+  })
 })
 
 app.post('/gifts/:id/received', auth, async (c) => {

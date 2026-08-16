@@ -36,6 +36,10 @@ const EN: Record<string, string> = {
   'Escribe algo': 'Write something',
   'Escribe tu nombre (2-40 caracteres)': 'Write your name (2-40 characters)',
   'Ese nombre de usuario ya está cogido': 'That username is already taken',
+  'Ese ya es tu nombre de usuario': 'That is already your username',
+  'Solo puedes cambiar tu nombre de usuario dos veces cada 14 días':
+    'You can only change your username twice every 14 days',
+  'Todavía no puedes reservar en esta lista': 'You cannot reserve on this list yet',
   'Ese regalo ya está cogido': 'That present is already taken',
   'Ese regalo ya está recibido': 'That present has already been received',
   'Ese teléfono no parece válido. Escríbelo con los 9 dígitos.':
@@ -106,6 +110,10 @@ const FR: Record<string, string> = {
   'Escribe algo': 'Écris quelque chose',
   'Escribe tu nombre (2-40 caracteres)': 'Écris ton nom (2 à 40 caractères)',
   'Ese nombre de usuario ya está cogido': "Ce nom d'utilisateur est déjà pris",
+  'Ese ya es tu nombre de usuario': "C'est déjà ton nom d'utilisateur",
+  'Solo puedes cambiar tu nombre de usuario dos veces cada 14 días':
+    "Tu ne peux changer ton nom d'utilisateur que deux fois tous les 14 jours",
+  'Todavía no puedes reservar en esta lista': 'Tu ne peux pas encore réserver sur cette liste',
   'Ese regalo ya está cogido': 'Ce cadeau est déjà pris',
   'Ese regalo ya está recibido': 'Ce cadeau a déjà été reçu',
   'Ese teléfono no parece válido. Escríbelo con los 9 dígitos.':

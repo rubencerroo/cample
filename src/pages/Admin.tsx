@@ -19,10 +19,6 @@ export default function Admin() {
         <p className="text-slate-600">{t('admin.sub')}</p>
       </div>
 
-      <p className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900">
-        {t('admin.notice')}
-      </p>
-
       <Stats />
 
       <div className="grid grid-cols-3 gap-2 rounded-2xl bg-slate-100 p-1">

@@ -310,6 +310,36 @@ año, cualquier respuesta mala que entrara en la caché del navegador se quedaba
 posible. Y `Avatar` reinicia su estado de error cuando cambia la URL, para que un fallo puntual de
 red no deje las iniciales fijas el resto de la sesión.
 
+## Foto propia del regalo
+
+Además de la que se saca del enlace (`gifts.image_url`), se puede subir una desde la galería, que es
+la única vía para lo que no viene de una tienda. Mismo camino que los avatares: bytes en
+**`gift_images`**, contador `gifts.image_version` que **solo sube**, y `has_image`. El navegador la
+reduce a 640px de lado mayor y la comprime (`fileToGiftImageDataUrl`); **no se recorta a cuadrado**,
+que un regalo alargado perdería justo lo que se quiere enseñar. `giftImageSrc()` decide cuál se
+pinta: la subida manda sobre la del enlace.
+
+⚠️ **`GET /gift-image/:id` va sin caché** (`private, no-store`), a diferencia del avatar. Una cara no
+es un secreto, pero esta foto **sí dice qué ha pedido alguien**: con `max-age=300` la imagen se
+quedaba en la caché del navegador y en la tablet compartida de casa la siguiente persona la sacaba
+de ahí aunque el servidor le respondiera 404. Se comprobó de verdad; no volver a ponerle caché.
+El endpoint además exige ser el dueño o amigo con `canSeeGift`, y responde 404 en vez de 403.
+
+⚠️ Bases anteriores necesitan `migrations/012_gift_images.sql`.
+
+## Cambiar el nombre de usuario
+
+Copiado de Instagram, que es donde la gente ya ha aprendido cómo funciona:
+
+- Como mucho **2 cambios cada 14 días** (`USERNAME_CAMBIOS` / `USERNAME_DIAS` en `routes.ts`).
+- El nombre que sueltas **te queda reservado 14 días** (`username_history`): nadie más puede
+  cogerlo, ni al cambiarse ni al registrarse.
+- **Volver a un nombre propio reservado no gasta cambio**: arreglar una equivocación no se castiga.
+
+`GET /me/username` devuelve cuántos cambios quedan y cuándo se libera el siguiente hueco.
+
+⚠️ Bases anteriores necesitan `migrations/013_username_change.sql`.
+
 ## Instalar en el móvil y «Compartir con Cample»
 
 - `public/sw.js` es un service worker **deliberadamente vacío** (solo un `fetch` que no hace nada):

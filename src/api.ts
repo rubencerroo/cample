@@ -37,6 +37,9 @@ export type Gift = {
   isArchived: boolean
   visibility: 'all' | 'only' | 'except'
   createdAt: number
+  // Foto propia subida desde la galería; manda sobre `imageUrl`. Ver `giftImageSrc`.
+  hasImage: boolean
+  imageVersion: number
   // solo en mi lista: a quién señala la restricción (los nombres son solo para el dueño)
   audience?: { username: string; displayName: string }[]
   // solo en listas ajenas: cuántas personas señala, nunca quiénes
@@ -199,6 +202,9 @@ export const api = {
   adminUsers: () => req<{ users: AdminUser[] }>('/admin/users'),
   setTrusted: (username: string, trusted: boolean) =>
     req(`/admin/users/${username}/trust`, { method: 'POST', ...body({ trusted }) }),
+  usernameStatus: () => req<{ left: number; nextAt: number | null }>('/me/username'),
+  setUsername: (username: string) =>
+    req<{ user: User }>('/me/username', { method: 'POST', ...body({ username }) }),
   myInvite: () => req<{ code: string }>('/invite'),
   inviteInfo: (code: string) => req<{ user: User | null }>(`/invite/${code}`),
   sendFeedback: (kind: 'bug' | 'idea', text: string) =>
@@ -246,6 +252,9 @@ export const api = {
   updateGift: (id: string, d: Record<string, unknown>) =>
     req<{ gift: Gift }>(`/gifts/${id}`, { method: 'PATCH', ...body(d) }),
   deleteGift: (id: string) => req(`/gifts/${id}`, { method: 'DELETE' }),
+  setGiftImage: (id: string, dataUrl: string) =>
+    req<{ gift: Gift }>(`/gifts/${id}/image`, { method: 'POST', ...body({ dataUrl }) }),
+  removeGiftImage: (id: string) => req<{ gift: Gift }>(`/gifts/${id}/image`, { method: 'DELETE' }),
   setReceived: (id: string, isReceived: boolean) =>
     req(`/gifts/${id}/received`, { method: 'POST', ...body({ isReceived }) }),
 

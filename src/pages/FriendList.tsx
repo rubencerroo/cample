@@ -10,6 +10,7 @@ import {
   VisibilityChip,
   birthdayLabel,
   daysUntilBirthday,
+  giftImageSrc,
   money,
   useAsync,
   useDialogos,
@@ -82,7 +83,9 @@ export default function FriendList() {
             return (
               <li key={g.id} className="card">
                 <div className="flex items-start gap-3">
-                  {g.imageUrl && <img src={g.imageUrl} alt="" className="h-16 w-16 rounded-2xl object-cover" loading="lazy" />}
+                  {giftImageSrc(g) && (
+                    <img src={giftImageSrc(g)!} alt="" className="h-16 w-16 rounded-2xl object-cover" loading="lazy" />
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-bold">{g.title}</h3>
