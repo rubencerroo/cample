@@ -531,8 +531,13 @@ Hechos y en marcha. Los detalles y el porqué de cada decisión están en
   sitios (`npx wrangler pages secret put` y, dentro de `cron/`, `npx wrangler secret put`).
 - **Ser pesado es la única forma de estropear esto**: como mucho un aviso del repaso cada 6 días por
   persona, cada una con su propio día y hora (entre las 10 y las 20) sacados de `numeroDe(id +
-  semana)`, y seis clases de mensaje que se van barajando con claves en `push_sent` para no
-  repetirse. Si un día no hay nada que contar, no se manda nada.
+  semana)`, **una misma clase de aviso no vuelve en 30 días** (`claseReciente`, y esto es lo que
+  de verdad lo sostiene: las claves por semana no bastaban), cada texto tiene dos o tres
+  redacciones que rotan con la semana, y los primeros 7 días de una cuenta el repaso calla. Medido
+  en el peor caso: 34 avisos al año, uno cada diez días. Si un día no hay nada que contar, no se
+  manda nada.
+- `POST /cron/tick?seco=1` **no manda nada**: dice qué le tocaría hoy a cada persona con su texto ya
+  redactado, saltándose el hueco y la hora. Es la forma de revisar los textos con datos reales.
 - El permiso **solo se pregunta una vez en la vida**: nunca lanzar el cuadro del navegador sin
   enseñar antes `AvisosPrompt`. En iPhone no existe si la app no está instalada. Y **desde la web no
   se puede desbloquear** a quien dijo que no: Ajustes solo puede explicar dónde se cambia en cada

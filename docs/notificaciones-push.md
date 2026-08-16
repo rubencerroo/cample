@@ -50,14 +50,26 @@ Todo lo demás se puede arreglar; que la familia apague los avisos, no. Por eso 
 - **Cada persona tiene su hueco propio**, un día de la semana y una hora entre las 10 y las 20, que
   salen de `numeroDe(id + semana)`. Ni todo el mundo a la vez, ni la misma persona siempre a la
   misma hora, ni nada de madrugada. Como el número depende de la semana, el hueco baila solo.
-- **El mensaje va cambiando**: seis clases de aviso, cada una con su clave en `push_sent` (por año,
-  por mes o por semana). El cumpleaños de un amigo gana siempre porque es el único con fecha; el
-  resto se barajan con la semana para que no salga siempre el mismo.
+- **Una clase de aviso no vuelve en 30 días**, haya motivo o no (`claseReciente`). Esto es lo que de
+  verdad evita la pesadez: las claves por semana o por mes no bastaban, porque alguien con amigos
+  activos cumple «hay cosas nuevas» todas las semanas del año y acabaría recibiendo siempre lo
+  mismo. El cumpleaños de un amigo se salta la regla —son personas distintas y es el aviso que
+  justifica todo esto—, pero lleva el año en la clave, así que va una vez por cumpleaños.
+- **Cada aviso tiene dos o tres redacciones** y la que toca sale de la semana, así que dos avisos
+  seguidos de la misma clase tampoco suenan igual. Un texto que llega siempre con las mismas
+  palabras se lee como una máquina.
+- **Los primeros 7 días de una cuenta, el repaso calla** (`DIAS_DE_GRACIA`): quien acaba de llegar
+  ya está mirando la app, no hace falta recordárselo.
 
-Las seis clases: cumple de un amigo (de 12 a 1 días antes, ventana ancha para que quepa el hueco
-semanal), mi propio cumple con la lista casi vacía, novedades de mis amigos, gente que quizá
-conozca, «están mirando tu lista» (mismas cautelas que `GET /me/pulse`: mínimo 3 amigos, nunca un
-número ni quién) y lista vacía o parada.
+Las clases: cumple de un amigo (de 12 a 1 días antes, ventana ancha para que quepa el hueco
+semanal), Navidad (del 1 al 18 de diciembre), mi propio cumple con la lista casi vacía, novedades de
+mis amigos, gente que quizá conozca, «están mirando tu lista» (mismas cautelas que `GET /me/pulse`:
+mínimo 3 amigos, nunca un número ni quién) y lista vacía o parada.
+
+**Cuánto sale en total**: simulando un año con alguien a quien le aplican todas las clases a la vez
+—el peor caso posible— salen **34 avisos al año, uno cada diez días**, repartidos por igual entre
+las clases y por todas las horas de 10 a 20. En la práctica son menos, más los cumpleaños, que son
+los que se quieren.
 
 Los avisos **reactivos** —solicitud de amistad, amistad aceptada, toque, colecta completa, mensajes
 nuevos en una colecta— salen en el momento. El del chat está limitado a **uno por hora y colecta**,
@@ -126,6 +138,16 @@ curl -X POST https://cample.pages.dev/api/cron/tick -H "X-Cron-Secret: <el secre
 
 Responde `{ ok, sent, candidates }`. Si `sent` es 0 casi siempre, es que está funcionando: la
 mayoría de las horas no le toca a nadie.
+
+Y para ver **qué le tocaría hoy a cada uno sin mandar nada**, saltándose el hueco y la hora:
+
+```bash
+curl -X POST "https://cample.pages.dev/api/cron/tick?seco=1" -H "X-Cron-Secret: <el secreto>"
+```
+
+Devuelve por persona su día y su hora de esta semana, el aviso que le saldría con su texto ya
+redactado, y si está esperando por algo (cuenta recién hecha, aviso reciente). Es la forma de
+comprobar los textos con datos de verdad sin esperar una semana ni molestar a nadie.
 
 ## Alternativa descartada
 

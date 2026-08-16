@@ -2577,15 +2577,38 @@ function diasHastaCumple(bd: string, hoy: { y: number; m: number; d: number }): 
 
 type Candidato = { clave: string; texto: string; link: string }
 
+/** Ninguna clase de aviso vuelve antes de esto, aunque siga habiendo motivo. Ver `claseReciente`. */
+const DIAS_ENTRE_AVISOS_IGUALES = 30
+
+/** Los primeros días de una cuenta, el repaso calla: quien acaba de llegar ya está mirando. */
+const DIAS_DE_GRACIA = 7
+
 /** Qué contarle hoy a esta persona, o nada. El cumpleaños de un amigo gana siempre. */
 async function elegirAviso(env: Env, u: any, hoy: ReturnType<typeof ahoraEnEspana>, semana: number) {
   const lang = u.push_lang
   const t = now()
+  // Cambia cada semana, así que la redacción elegida cambia con ella.
+  const semilla = numeroDe(`${u.id}:${semana}:texto`)
 
   const yaMandado = async (clave: string) =>
     !!(await env.DB.prepare('SELECT 1 AS ok FROM push_sent WHERE user_id = ? AND key = ?')
       .bind(u.id, clave)
       .first())
+
+  /**
+   * ⚠️ Lo que de verdad evita ser pesado. Las claves por mes o por semana no bastan: alguien con
+   * amigos activos cumpliría «hay cosas nuevas» todas las semanas del año y acabaría recibiendo
+   * siempre el mismo aviso, que es la forma más rápida de que lo apague. Una clase no vuelve en un
+   * mes, con motivo o sin él, y así el repaso tiene que ir contando cosas distintas.
+   */
+  const claseReciente = async (clase: string) => {
+    const r = await env.DB.prepare(
+      "SELECT MAX(at) AS ultimo FROM push_sent WHERE user_id = ? AND key LIKE ? || ':%'",
+    )
+      .bind(u.id, clase)
+      .first<{ ultimo: number | null }>()
+    return (r?.ultimo ?? 0) > t - DIAS_ENTRE_AVISOS_IGUALES * 86400
+  }
 
   // 1. El cumpleaños de un amigo. Es el único aviso con fecha, así que se mira en una ventana
   //    ancha (de 12 a 1 días antes): el hueco semanal de cada persona caerá dentro seguro.
@@ -2604,15 +2627,19 @@ async function elegirAviso(env: Env, u: any, hoy: ReturnType<typeof ahoraEnEspan
     if (dias === null || dias < 1 || dias > 12) continue
     if (!mejor || dias < mejor.dias) mejor = { dias, a }
   }
+  // El cumple se salta la regla de los 30 días: son personas distintas y es el aviso que justifica
+  // todo esto. La clave lleva el año, así que cada persona se avisa una vez por cumpleaños.
   if (mejor) {
     const clave = `cumple:${mejor.a.id}:${hoy.y}`
     if (!(await yaMandado(clave)))
       return {
         clave,
-        texto: textoAviso(lang, mejor.dias === 1 ? 'aviso.cumpleManana' : 'aviso.cumple', {
-          nombre: mejor.a.display_name,
-          dias: mejor.dias,
-        }),
+        texto: textoAviso(
+          lang,
+          mejor.dias === 1 ? 'aviso.cumpleManana' : 'aviso.cumple',
+          { nombre: mejor.a.display_name, dias: mejor.dias },
+          semilla,
+        ),
         link: `/lista/${mejor.a.username}`,
       }
   }
@@ -2645,39 +2672,46 @@ async function elegirAviso(env: Env, u: any, hoy: ReturnType<typeof ahoraEnEspan
 
   const mes = `${hoy.y}-${String(hoy.m).padStart(2, '0')}`
   const posibles: Candidato[] = []
+  const mete = (clase: string, sufijo: string, texto: string, link: string) =>
+    posibles.push({ clave: `${clase}:${sufijo}`, texto, link })
+
+  // Del 1 al 18 de diciembre: es la época del año en la que esta app sirve para algo de verdad.
+  if (hoy.m === 12 && hoy.d <= 18 && (r?.amigos ?? 0) > 0)
+    mete('navidad', String(hoy.y), textoAviso(lang, 'aviso.navidad', undefined, semilla), '/')
 
   // Mi propio cumpleaños encima y la lista vacía: es cuando más duele no tener nada apuntado.
   const miCumple = u.birthday ? diasHastaCumple(u.birthday, hoy) : null
   if (miCumple !== null && miCumple >= 5 && miCumple <= 21 && (r?.mios ?? 0) < 3)
-    posibles.push({
-      clave: `micumple:${hoy.y}`,
-      texto: textoAviso(lang, 'aviso.miCumple', { dias: miCumple }),
-      link: '/mi-lista',
-    })
+    mete(
+      'micumple',
+      String(hoy.y),
+      textoAviso(lang, 'aviso.miCumple', { dias: miCumple }, semilla),
+      '/mi-lista',
+    )
 
   if ((r?.nuevos ?? 0) >= 3)
-    posibles.push({
-      clave: `novedades:${semana}`,
-      texto: textoAviso(lang, 'aviso.novedades', { n: r.nuevos }),
-      link: '/',
-    })
+    mete('novedades', String(semana), textoAviso(lang, 'aviso.novedades', { n: r.nuevos }, semilla), '/')
 
   if ((r?.sugerencias ?? 0) >= 3)
-    posibles.push({ clave: `sugerencias:${mes}`, texto: textoAviso(lang, 'aviso.sugerencias'), link: '/amigos' })
+    mete('sugerencias', mes, textoAviso(lang, 'aviso.sugerencias', undefined, semilla), '/amigos')
 
   // El pulso: alguien ha entrado en mi lista. Un rango, nunca un número, y nunca quién — las
   // mismas cautelas que `GET /me/pulse`, incluido el mínimo de 3 amigos.
   if ((r?.amigos ?? 0) >= 3 && (r?.visitas ?? 0) > 0 && (r?.mios ?? 0) < 5)
-    posibles.push({ clave: `pulso:${mes}`, texto: textoAviso(lang, 'aviso.pulso'), link: '/mi-lista' })
+    mete('pulso', mes, textoAviso(lang, 'aviso.pulso', undefined, semilla), '/mi-lista')
 
   if ((r?.mios ?? 0) === 0)
-    posibles.push({ clave: `listavacia:${mes}`, texto: textoAviso(lang, 'aviso.listaVacia'), link: '/mi-lista' })
+    mete('listavacia', mes, textoAviso(lang, 'aviso.listaVacia', undefined, semilla), '/mi-lista')
   else if ((r?.mios ?? 0) < 3 && (r?.ultimo ?? 0) < t - 120 * 86400)
-    posibles.push({ clave: `listaparada:${mes}`, texto: textoAviso(lang, 'aviso.listaParada'), link: '/mi-lista' })
+    mete('listaparada', mes, textoAviso(lang, 'aviso.listaParada', undefined, semilla), '/mi-lista')
 
   // Se barajan con la semana, para que no salga siempre el mismo por estar antes en la lista.
   posibles.sort((a, b) => numeroDe(u.id + semana + a.clave) - numeroDe(u.id + semana + b.clave))
-  for (const p of posibles) if (!(await yaMandado(p.clave))) return p
+  for (const p of posibles) {
+    const clase = p.clave.slice(0, p.clave.indexOf(':'))
+    if (await claseReciente(clase)) continue
+    if (!(await yaMandado(p.clave))) return p
+  }
   return null
 }
 
@@ -2692,9 +2726,13 @@ app.post('/cron/tick', async (c) => {
   if (!secreto || !timingSafeEqual(dado, secreto)) return c.json({ error: 'No encontrado' }, 404)
   if (!pushConfigurado(c.env)) return c.json({ ok: true, sent: 0, skipped: 'sin claves' })
 
+  // `?seco=1` no manda nada: dice qué le tocaría a cada persona saltándose el hueco y la hora.
+  // Es la única forma cómoda de ver si los textos salen bien sin esperar una semana.
+  const seco = c.req.query('seco') === '1'
   const hoy = ahoraEnEspana()
   // Ni de madrugada ni a la hora de comer: el aviso tiene que caer en un momento cómodo.
-  if (hoy.hora < 10 || hoy.hora > 20) return c.json({ ok: true, sent: 0, skipped: 'hora' })
+  if (!seco && (hoy.hora < 10 || hoy.hora > 20))
+    return c.json({ ok: true, sent: 0, skipped: 'hora' })
 
   const t = now()
   const dia = Math.floor(t / 86400)
@@ -2702,22 +2740,43 @@ app.post('/cron/tick', async (c) => {
   const diaDeLaSemana = dia % 7
 
   const { results } = await c.env.DB.prepare(
-    `SELECT u.id, u.birthday, u.push_lang FROM users u
-      WHERE u.is_active = 1 AND u.push_last_at < ?1
-        AND EXISTS (SELECT 1 FROM push_subs s WHERE s.user_id = u.id)`,
+    // En seco entran todos y se explica luego por qué a cada uno le toca o no; en real, las dos
+    // puertas van en el WHERE. A quien acaba de llegar no se le da la lata: lleva tres días aquí y
+    // ya sabe de sobra que su lista está vacía.
+    `SELECT u.id, u.birthday, u.push_lang, u.username, u.created_at, u.push_last_at FROM users u
+      WHERE u.is_active = 1
+        AND EXISTS (SELECT 1 FROM push_subs s WHERE s.user_id = u.id)
+        ${seco ? '' : 'AND u.push_last_at < ?1 AND u.created_at < ?2'}`,
   )
-    .bind(t - 6 * 86400)
+    .bind(...(seco ? [] : [t - 6 * 86400, t - DIAS_DE_GRACIA * 86400]))
     .all<any>()
 
   let enviados = 0
+  const prueba: any[] = []
   for (const u of results) {
     // El hueco de cada persona esta semana: su día y su hora, distintos de los de los demás y
     // distintos de los suyos de la semana pasada.
     const n = numeroDe(`${u.id}:${semana}`)
-    if (n % 7 !== diaDeLaSemana) continue
-    if (10 + ((n >>> 3) % 11) !== hoy.hora) continue
+    if (!seco && n % 7 !== diaDeLaSemana) continue
+    if (!seco && 10 + ((n >>> 3) % 11) !== hoy.hora) continue
 
     const aviso = await elegirAviso(c.env, u, hoy, semana)
+    if (seco) {
+      prueba.push({
+        usuario: u.username,
+        dia: n % 7,
+        hora: 10 + ((n >>> 3) % 11),
+        espera:
+          u.created_at > t - DIAS_DE_GRACIA * 86400
+            ? 'cuenta recién hecha'
+            : u.push_last_at > t - 6 * 86400
+              ? 'ya tuvo aviso hace poco'
+              : null,
+        aviso: aviso ? aviso.clave : null,
+        texto: aviso?.texto ?? null,
+      })
+      continue
+    }
     if (!aviso) continue
 
     await c.env.DB.prepare('INSERT OR IGNORE INTO push_sent (user_id, key, at) VALUES (?, ?, ?)')
@@ -2727,6 +2786,7 @@ app.post('/cron/tick', async (c) => {
     await notify(c.env, u.id, 'repaso', aviso.texto, aviso.link, aviso.texto)
     enviados++
   }
+  if (seco) return c.json({ ok: true, dry: true, candidates: results.length, prueba })
   return c.json({ ok: true, sent: enviados, candidates: results.length })
 })
 
