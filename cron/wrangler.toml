@@ -11,6 +11,8 @@
 name = "cample-cron"
 main = "src/index.js"
 compatibility_date = "2025-01-01"
+# Sin dirección pública: esto no atiende peticiones, solo se despierta con el reloj.
+workers_dev = false
 
 [triggers]
 # Cada hora, en el minuto 7 (no en punto, que es cuando se amontona medio mundo). Quién recibe algo
