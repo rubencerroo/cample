@@ -146,6 +146,23 @@ npm run build && npx wrangler pages dev dist --port 8788
 `npm run dev` (Vite en 5173) proxya `/api` a 8788, así que para trabajar en la UI conviene tener
 los dos procesos. Typecheck: `npx tsc --noEmit`.
 
+## Permisos: qué puede hacer Claude solo
+
+**La sesión de PowerShell ya está autenticada** (Wrangler y git). Ruben autoriza a ejecutar el
+ciclo completo **sin volver a preguntar en cada sesión**:
+
+- `git add` / `commit` / `push` a `main`.
+- Migraciones remotas: `npx wrangler d1 execute cample-db --remote -y --file=...`.
+- Consultas a la base de producción, incluidas las de escritura puntuales.
+- `npm run deploy`.
+
+El orden es siempre el mismo: **git → migración remota (si toca `schema.sql`) → deploy**.
+
+⚠️ Lo que sigue exigiendo avisar antes: **borrar o vaciar datos de producción**, rotar secretos, y
+cualquier migración que **rehaga una tabla** (`DROP TABLE` + copia, como la 011). En ese último caso,
+sacar antes una copia con `npx wrangler d1 execute` o `npx wrangler d1 export cample-db --remote
+--output <fichero>` **fuera del repositorio** (lleva hashes de contraseñas: nunca en `git`).
+
 ## Control de versiones
 
 Repositorio **privado** en `github.com/rubencerroo/cample`, rama `main`.
