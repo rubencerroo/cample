@@ -31,7 +31,7 @@ export default function FriendList() {
   if (list.error) return <ErrorBox>{list.error}</ErrorBox>
   if (!list.data) return null
 
-  const { user, gifts } = list.data
+  const { user, gifts, canSeeReservations } = list.data
   const pending = gifts.filter((g) => !g.isReceived)
   const received = gifts.filter((g) => g.isReceived)
 
@@ -61,7 +61,9 @@ export default function FriendList() {
       {user.bio && <p className="text-slate-600">{user.bio}</p>}
 
       <p className="rounded-2xl bg-brand-50 border border-brand-200 px-4 py-3 text-sm text-brand-900">
-        {t('friendList.notice', { name: user.displayName.split(' ')[0] })}
+        {canSeeReservations
+          ? t('friendList.notice', { name: user.displayName.split(' ')[0] })
+          : t('friendList.waitingNotice')}
       </p>
 
       {/* Una reacción NO es una reserva y sí la ve el dueño: hay que decirlo antes, no después. */}
@@ -92,7 +94,8 @@ export default function FriendList() {
                       ) : !free ? (
                         <span className="chip bg-slate-200 text-slate-600">{t('friendList.taken')}</span>
                       ) : null}
-                      {g.quantity > 1 && (
+                      {/* «Quedan N» es información de reserva: si aún no la ve, no se enseña. */}
+                      {g.quantity > 1 && canSeeReservations && (
                         <span className="chip bg-slate-100 text-slate-600">
                           {t('friendList.asksFor', { n: g.quantity, left: g.remaining! })}
                         </span>
@@ -129,7 +132,13 @@ export default function FriendList() {
                       </Link>
                     )}
 
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {/* Sin la señal de reservas no se puede reservar (si no, se sabría probando).
+                        Lo que ya llevaba uno sí se puede soltar. */}
+                    <div
+                      className={`mt-3 flex flex-wrap items-center gap-2 ${
+                        canSeeReservations || g.reservedByMe ? '' : 'hidden'
+                      }`}
+                    >
                       {g.reservedByMe ? (
                         <>
                           {g.quantity > 1 && (

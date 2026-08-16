@@ -43,6 +43,7 @@ export const fr: Dict = {
   'auth.document': "Pièce d'identité (DNI ou NIE)",
   'auth.documentHint':
     "Cela sert uniquement à vérifier que c'est bien toi. Ce numéro n'est jamais conservé tel quel et personne ne le voit.",
+  'auth.invitedBy': "{nombre} t'invite. Dès que tu crées ton compte, vous serez amis.",
   'auth.phone': 'Téléphone (facultatif)',
   'auth.phoneHint':
     'Cela permet à ta famille de te retrouver depuis ses contacts. Personne ne voit ton numéro.',
@@ -52,6 +53,8 @@ export const fr: Dict = {
     "Fais-en la demande ici et préviens la personne qui s'occupe de Cample dans ta famille. Elle te donnera un code pour choisir un nouveau mot de passe.",
   'auth.reset.username': "Ton nom d'utilisateur",
   'auth.reset.document': "Ton numéro de pièce d'identité",
+  'auth.reset.documentHint':
+    "Seulement si tu l'as indiqué en créant ton compte. Sinon, laisse vide.",
   'auth.reset.sent':
     "Demande envoyée. Quand on te donnera le code, saisis-le ici avec ton nouveau mot de passe.",
   'auth.reset.code': 'Code',
@@ -154,6 +157,8 @@ export const fr: Dict = {
 
   'friendList.notice':
     "Si tu réserves un cadeau, {name} n'en saura rien. Les autres verront seulement qu'il est pris, sans savoir par qui.",
+  'friendList.waitingNotice':
+    "Tu ne vois pas encore ce que les autres ont déjà pris dans cette liste, et tu ne peux pas y réserver. Cela s'ouvrira tout seul quand vous serez amis depuis un certain temps.",
   'friendList.reactionNotice':
     'Si tu appuies sur un cœur, {name} le verra : c’est une façon de dire que son idée te plaît.',
   'friendList.nudgeText': '{name} n’a pas noté beaucoup d’idées. Tu peux lui demander d’en ajouter.',
@@ -224,6 +229,14 @@ export const fr: Dict = {
   'group.messagePlaceholder': 'Écris un message…',
 
   'friends.title': 'Amis',
+  'friends.inviteTitle': 'Inviter quelqu’un',
+  'friends.inviteText':
+    'Envoie-lui ce lien. Dès son inscription vous serez déjà connectés, sans avoir à vous chercher.',
+  'friends.inviteShare': 'Partager le lien',
+  'friends.inviteCopy': 'Copier le lien',
+  'friends.inviteCopied': 'Lien copié',
+  'friends.inviteMessage':
+    'Je t’ajoute sur Cample pour qu’on ne m’offre pas deux fois la même chose : {url}',
   'friends.search': 'Chercher des personnes',
   'friends.searchPlaceholder': "Nom ou nom d'utilisateur",
   'friends.results': 'Résultats',
@@ -281,7 +294,7 @@ export const fr: Dict = {
   'settings.birthdayPlaceholder': '24-12 (jour-mois)',
   'settings.birthdayHintSet': 'Tes amis verront que tu le fêtes le {date}.',
   'settings.birthdayHint':
-    'Écris le jour et le mois, comme ceci : 24-12. Tes amis le verront sur ta liste.',
+    'Écris quatre chiffres : le jour et le mois. Par exemple 2412 pour le 24 décembre. Le tiret se met tout seul.',
   'settings.language': 'Langue',
   'settings.languageHint':
     'Elle suit automatiquement ton téléphone, mais tu peux la changer ici quand tu veux.',
@@ -428,6 +441,14 @@ export const fr: Dict = {
   'admin.userLine': '@{user} · {gifts} cadeaux · {friends} amis · depuis le {date}',
   'admin.disable': 'Désactiver',
   'admin.enable': 'Réactiver',
+  'admin.trustedChip': 'Débloqué',
+  'admin.suspiciousChip': 'À vérifier',
+  'admin.trust': 'Débloquer',
+  'admin.untrust': 'Retirer le déblocage',
+  'admin.trustHint':
+    "Ne débloque que les personnes dont tu sais qu'elles sont réelles : elles verront dès le premier jour ce qui est déjà pris dans les listes de leurs amis.",
+  'admin.confirmUntrust':
+    'Retirer le déblocage de {name} ? Cette personne devra de nouveau attendre dans les listes de ses nouveaux amis.',
   'admin.confirmDeleteUser':
     'Supprimer le compte de {name} ? Ses cadeaux disparaissent aussi et rien ne peut être annulé.',
   'admin.bug': 'Panne',

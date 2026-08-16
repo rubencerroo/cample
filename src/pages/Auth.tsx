@@ -1,15 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, User } from '../api'
-import { ErrorBox } from '../ui'
+import { Avatar, ErrorBox } from '../ui'
 import { useT } from '../i18n'
+
+// Quien llega con ?invitacion=… entra directo al registro y sale con esa amistad ya hecha.
+const invite = new URLSearchParams(location.search).get('invitacion') ?? ''
 
 export default function Auth({ onAuth }: { onAuth: (u: User) => void }) {
   const t = useT()
   const [forgot, setForgot] = useState(false)
-  const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [form, setForm] = useState({ username: '', password: '', displayName: '', document: '', phone: '' })
+  const [mode, setMode] = useState<'login' | 'register'>(invite ? 'register' : 'login')
+  const [form, setForm] = useState({ username: '', password: '', displayName: '', phone: '' })
+  const [quienInvita, setQuienInvita] = useState<User | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (invite) api.inviteInfo(invite).then((r) => setQuienInvita(r.user)).catch(() => {})
+  }, [])
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [k]: e.target.value })
@@ -22,7 +30,7 @@ export default function Auth({ onAuth }: { onAuth: (u: User) => void }) {
       const r =
         mode === 'login'
           ? await api.login(form.username, form.password)
-          : await api.register(form)
+          : await api.register({ ...form, invite })
       onAuth(r.user)
     } catch (err: any) {
       setError(err.message)
@@ -38,6 +46,15 @@ export default function Auth({ onAuth }: { onAuth: (u: User) => void }) {
         <h1 className="text-4xl font-extrabold tracking-tight text-brand-600">Cample</h1>
         <p className="mt-2 text-slate-600">{t('auth.tagline')}</p>
       </div>
+
+      {quienInvita && !forgot && (
+        <div className="card flex items-center gap-3">
+          <Avatar user={quienInvita} size={48} />
+          <p className="text-slate-700">
+            {t('auth.invitedBy', { nombre: quienInvita.displayName })}
+          </p>
+        </div>
+      )}
 
       {forgot && <Forgot onDone={() => setForgot(false)} />}
 
@@ -99,24 +116,6 @@ export default function Auth({ onAuth }: { onAuth: (u: User) => void }) {
             required
           />
         </div>
-
-        {mode === 'register' && (
-          <div>
-            <label className="label" htmlFor="document">
-              {t('auth.document')}
-            </label>
-            <input
-              id="document"
-              className="input"
-              value={form.document}
-              onChange={set('document')}
-              autoCapitalize="characters"
-              placeholder="12345678Z"
-              required
-            />
-            <p className="mt-1.5 text-sm text-slate-500">{t('auth.documentHint')}</p>
-          </div>
-        )}
 
         {mode === 'register' && (
           <div>
@@ -209,9 +208,11 @@ function Forgot({ onDone }: { onDone: () => void }) {
             <label className="label" htmlFor="fu">{t('auth.reset.username')}</label>
             <input id="fu" className="input" value={f.username} onChange={set('username')} autoCapitalize="none" required />
           </div>
+          {/* Solo lo tienen las cuentas antiguas; quien no lo puso lo deja en blanco. */}
           <div>
             <label className="label" htmlFor="fd">{t('auth.reset.document')}</label>
-            <input id="fd" className="input" value={f.document} onChange={set('document')} autoCapitalize="characters" required />
+            <input id="fd" className="input" value={f.document} onChange={set('document')} autoCapitalize="characters" />
+            <p className="mt-1.5 text-sm text-slate-500">{t('auth.reset.documentHint')}</p>
           </div>
         </>
       ) : (

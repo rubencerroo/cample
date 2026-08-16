@@ -43,6 +43,7 @@ export const es = {
   'auth.password': 'Contraseña',
   'auth.document': 'DNI o NIE',
   'auth.documentHint': 'Sirve para verificar que eres tú. No se guarda tal cual ni lo ve nadie.',
+  'auth.invitedBy': 'Te invita {nombre}. Al crear tu cuenta ya seréis amigos.',
   'auth.phone': 'Teléfono (opcional)',
   'auth.phoneHint': 'Sirve para que tu familia te encuentre desde su agenda. Nadie ve tu número.',
   'auth.forgot': 'No me acuerdo de mi contraseña',
@@ -51,6 +52,7 @@ export const es = {
     'Pídelo aquí y avisa a la persona que administra Cample en tu familia. Ella te dará un código para poner una contraseña nueva.',
   'auth.reset.username': 'Tu nombre de usuario',
   'auth.reset.document': 'Tu DNI o NIE',
+  'auth.reset.documentHint': 'Solo si lo pusiste al crear la cuenta. Si no, déjalo en blanco.',
   'auth.reset.sent':
     'Solicitud enviada. Cuando te den el código, escríbelo aquí junto con la contraseña nueva.',
   'auth.reset.code': 'Código',
@@ -150,6 +152,9 @@ export const es = {
 
   'friendList.notice':
     'Si reservas un regalo, {name} no se entera de nada. Los demás solo verán que está cogido, sin saber por quién.',
+  // Neutro a propósito: no se explica de qué protege (regla 6).
+  'friendList.waitingNotice':
+    'Todavía no ves lo que ya lleva la gente en esta lista, ni puedes reservar aquí. Se abre solo cuando lleváis un tiempo siendo amigos.',
   'friendList.reactionNotice':
     'Si pulsas un corazón, {name} lo verá: sirve para decirle que te gusta lo que ha pedido.',
   'friendList.nudgeText': 'A {name} le faltan ideas apuntadas. Puedes pedirle que añada más.',
@@ -219,6 +224,13 @@ export const es = {
   'group.messagePlaceholder': 'Escribe un mensaje…',
 
   'friends.title': 'Amigos',
+  'friends.inviteTitle': 'Invitar a alguien',
+  'friends.inviteText':
+    'Mándale este enlace. Cuando cree su cuenta ya estaréis conectados, sin tener que buscarse.',
+  'friends.inviteShare': 'Compartir enlace',
+  'friends.inviteCopy': 'Copiar enlace',
+  'friends.inviteCopied': 'Enlace copiado',
+  'friends.inviteMessage': 'Te apunto en Cample para que no me regalen dos veces lo mismo: {url}',
   'friends.search': 'Buscar personas',
   'friends.searchPlaceholder': 'Nombre o usuario',
   'friends.results': 'Resultados',
@@ -275,7 +287,8 @@ export const es = {
   'settings.birthday': 'Cumpleaños (opcional)',
   'settings.birthdayPlaceholder': '24-12 (día-mes)',
   'settings.birthdayHintSet': 'Tus amigos verán que lo celebras el {date}.',
-  'settings.birthdayHint': 'Escribe el día y el mes, así: 24-12. Tus amigos lo verán en tu lista.',
+  'settings.birthdayHint':
+    'Escribe cuatro números: el día y el mes. Por ejemplo 2412 para el 24 de diciembre. El guion se pone solo.',
   'settings.language': 'Idioma',
   'settings.languageHint': 'Se elige solo según tu móvil, pero puedes cambiarlo aquí cuando quieras.',
   'settings.phoneTitle': 'Tu teléfono',
@@ -418,6 +431,14 @@ export const es = {
   'admin.userLine': '@{user} · {gifts} regalos · {friends} amigos · desde {date}',
   'admin.disable': 'Desactivar',
   'admin.enable': 'Reactivar',
+  'admin.trustedChip': 'Desbloqueada',
+  'admin.suspiciousChip': 'Revisar',
+  'admin.trust': 'Desbloquear',
+  'admin.untrust': 'Quitar desbloqueo',
+  'admin.trustHint':
+    'Desbloquea solo a quien sepas que es una persona real: podrá ver desde el primer día lo que ya lleva la gente en las listas de sus amigos.',
+  'admin.confirmUntrust':
+    '¿Quitar el desbloqueo a {name}? Volverá a tener que esperar en las listas de sus amigos nuevos.',
   'admin.confirmDeleteUser':
     '¿Borrar la cuenta de {name}? Se eliminan sus regalos y no se puede deshacer.',
   'admin.bug': 'Fallo',

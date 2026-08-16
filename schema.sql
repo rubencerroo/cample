@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   bio          TEXT NOT NULL DEFAULT '',
   avatar_seed  TEXT NOT NULL DEFAULT '',
   password_hash TEXT NOT NULL,                -- pbkdf2$iter$salt$hash
-  dni_hash     TEXT NOT NULL UNIQUE,          -- HMAC-SHA256(DNI, DNI_PEPPER). Nunca el DNI en claro.
+  dni_hash     TEXT,                          -- opcional y heredado: HMAC-SHA256(DNI, DNI_PEPPER).
   phone_hash   TEXT,                          -- opcional, HMAC igual que el DNI. Solo para encontrarse.
   birthday     TEXT,                          -- MM-DD opcional
   created_at   INTEGER NOT NULL,
@@ -15,10 +15,32 @@ CREATE TABLE IF NOT EXISTS users (
   is_admin     INTEGER NOT NULL DEFAULT 0,    -- puede aprobar reseteos de contraseña
   avatar_version INTEGER NOT NULL DEFAULT 0,  -- contador que SOLO sube: da una URL nueva a cada foto
   has_avatar     INTEGER NOT NULL DEFAULT 0,  -- si ahora mismo tiene foto puesta
-  onboarding_seen INTEGER NOT NULL DEFAULT 0  -- versión de la guía de bienvenida ya vista
+  onboarding_seen INTEGER NOT NULL DEFAULT 0, -- versión de la guía de bienvenida ya vista
+  trust_level  INTEGER NOT NULL DEFAULT 0,    -- 0 normal, 1 verificada (ve las reservas sin espera)
+  trust_source TEXT,                          -- 'admin' | 'phone' | 'dni'
+  trusted_at   INTEGER
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone_hash) WHERE phone_hash IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_dni   ON users(dni_hash)   WHERE dni_hash   IS NOT NULL;
+
+-- Señales del registro, solo para que un admin detecte cuentas duplicadas. No bloquean nada.
+CREATE TABLE IF NOT EXISTS signup_signals (
+  user_id    TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  ip_hash    TEXT,
+  ua_hash    TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_signals_ip ON signup_signals(ip_hash);
+
+-- Enlaces de invitación: quien entra por uno sale con la amistad ya hecha.
+CREATE TABLE IF NOT EXISTS invites (
+  code       TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  uses       INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_invites_user ON invites(user_id);
 
 -- Fotos de perfil aparte, para que las consultas de `users` no arrastren los bytes.
 CREATE TABLE IF NOT EXISTS avatars (

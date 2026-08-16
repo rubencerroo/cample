@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../App'
-import { Avatar, ErrorBox, birthdayLabel, fileToAvatarDataUrl, useDialogos } from '../ui'
+import { Avatar, ErrorBox, birthdayLabel, fileToAvatarDataUrl, mascaraCumple, useDialogos } from '../ui'
 import { LANGS, useI18n, useT } from '../i18n'
 import { ICON, Icon } from '../icons'
 
@@ -163,7 +163,7 @@ export default function Settings() {
                 inputMode="numeric"
                 placeholder={t('settings.birthdayPlaceholder')}
                 value={f.birthday}
-                onChange={(e) => setF({ ...f, birthday: e.target.value })}
+                onChange={(e) => setF({ ...f, birthday: mascaraCumple(e.target.value) })}
               />
               <p className="mt-1.5 text-sm text-slate-500">
                 {birthdayLabel(f.birthday)

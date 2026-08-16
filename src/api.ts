@@ -60,6 +60,9 @@ export type AdminUser = {
   isAdmin: boolean
   gifts: number
   friends: number
+  trusted: boolean
+  trustSource: string | null
+  suspicious: boolean
 }
 
 export type GroupMember = {
@@ -194,6 +197,10 @@ export const api = {
       }
     }>('/admin/stats'),
   adminUsers: () => req<{ users: AdminUser[] }>('/admin/users'),
+  setTrusted: (username: string, trusted: boolean) =>
+    req(`/admin/users/${username}/trust`, { method: 'POST', ...body({ trusted }) }),
+  myInvite: () => req<{ code: string }>('/invite'),
+  inviteInfo: (code: string) => req<{ user: User | null }>(`/invite/${code}`),
   sendFeedback: (kind: 'bug' | 'idea', text: string) =>
     req('/feedback', { method: 'POST', ...body({ kind, body: text }) }),
   adminFeedback: () => req<{ feedback: Feedback[] }>('/admin/feedback'),
@@ -242,7 +249,8 @@ export const api = {
   setReceived: (id: string, isReceived: boolean) =>
     req(`/gifts/${id}/received`, { method: 'POST', ...body({ isReceived }) }),
 
-  list: (username: string) => req<{ user: User; gifts: Gift[] }>(`/lists/${username}`),
+  list: (username: string) =>
+    req<{ user: User; gifts: Gift[]; canSeeReservations: boolean }>(`/lists/${username}`),
   reserve: (id: string, units = 1) =>
     req<{ units: number }>(`/gifts/${id}/reserve`, { method: 'POST', ...body({ units }) }),
   unreserve: (id: string) => req(`/gifts/${id}/reserve`, { method: 'DELETE' }),

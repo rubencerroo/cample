@@ -115,6 +115,17 @@ export function Avatar({ user, size = 44 }: { user: AvatarUser; size?: number })
   )
 }
 
+/**
+ * Pone el guion del cumpleaños solo, mientras se escribe: 2412 -> 24-12.
+ * En el iPhone el teclado numérico no trae guion, así que a mano no se puede escribir.
+ * Solo aparece a partir del tercer número, para que se pueda borrar hacia atrás sin quedarse
+ * atrapado en «24-».
+ */
+export function mascaraCumple(raw: string) {
+  const n = raw.replace(/\D/g, '').slice(0, 4)
+  return n.length <= 2 ? n : `${n.slice(0, 2)}-${n.slice(2)}`
+}
+
 /** «24 de diciembre» / «24 December» a partir de DD-MM. */
 export function birthdayLabel(birthday: string | null | undefined) {
   if (!birthday) return null

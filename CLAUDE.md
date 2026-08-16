@@ -20,9 +20,10 @@ Una consulta filtrada devolviendo 0 no significa que no haya filas.
 2. **Entre amigos, la reserva es anónima.** Se muestra «ya lo lleva alguien» / cuántas unidades
    quedan, nunca la identidad. La excepción es uno mismo (`reservedByMe`).
 3. **Solo el dueño marca «recibido»** (`POST /gifts/:id/received`). Es la única señal que emite.
-4. **Una cuenta por persona**: DNI/NIE validado (letra de control) y guardado como
-   `HMAC-SHA256(documento, DNI_PEPPER)` en `users.dni_hash UNIQUE`. El documento **nunca** se
-   guarda ni se devuelve en claro. Esto es la defensa contra la cuenta-espía.
+4. **La cuenta-espía no se impide, se deja sin premio.** En la web abierta no hay forma de evitar
+   que alguien se cree una segunda cuenta, así que la señal de reserva se gana: ver «ya lo lleva
+   alguien» en la lista de un amigo exige 7 días de amistad **y** 2 amigos en común, o estar
+   desbloqueado. Ver «Confianza» más abajo. (El DNI hacía este papel hasta agosto de 2026.)
 5. **Lista privada**: solo amigos aceptados (relación mutua) leen `/lists/:username`.
 6. **No explicar la trampa en los textos.** El copy de la app no menciona nunca «segunda cuenta»,
    «espiar» ni cómo funciona la protección: describir la defensa es sugerir el ataque. El DNI se
@@ -59,6 +60,57 @@ src/pages/                  Auth, Home, MyList, FriendList, Friends, Reservation
 ```
 
 Rutas de la UI: `/`, `/mi-lista`, `/lista/:username`, `/amigos`, `/reservas`, `/ajustes`.
+
+## Confianza: quién ve las reservas y cuándo
+
+El ataque contra el que se defiende Cample es raro: **el atacante y la víctima son la misma
+persona**. Alguien se crea una segunda cuenta, se agrega a sí mismo desde ella y ve su propia lista
+«como amigo», con lo que se destripa la sorpresa. No hace falta ningún tercero. Lo que se daña no
+es una persona sino la credibilidad de la app: si quien regala no se fía, la app no sirve.
+
+`puedeVerReservas(env, viewer, owner)` decide si alguien ve el estado de reserva de una lista:
+
+```
+trust_level = 1   O   (amistad ≥ 7 días  Y  ≥ 2 amigos en común)
+```
+
+- ⚠️ **Solo mira a quien mira, jamás al dueño.** Fiarse del dueño sería darle la llave de su propia
+  casa: su cuenta principal es de fiar y la falsa entraría por ahí. No añadir esa «simplificación».
+- Los 2 amigos en común son lo que sostiene todo: una cuenta nueva no los puede fabricar sola,
+  hacen falta dos personas reales que la acepten. Los 7 días solo matan el impulso.
+- **Mientras el gate está cerrado tampoco se puede reservar ni ver/crear colectas** en esa lista
+  (`403`, y `404` en `groupAccess`). Si se dejara reservar, el filtro se saltaría sondeando: los
+  regalos que respondiesen «ya está reservado» serían justo los que se ocultan. Quien ya tenía algo
+  cogido sí puede soltarlo.
+- Los mismos criterios en SQL están en `VE_RESERVAS_SQL` (espera `?1` = quien mira, `?2` = el corte
+  de antigüedad y una tabla `g` con `user_id`), y filtran las colectas de `GET /activity`.
+- El copy es neutro (`friendList.waitingNotice`): «se abre cuando lleváis un tiempo». **No explicar
+  de qué protege** (regla 6).
+
+`trust_level` sube solo por dos vías: el registro de un admin, o el botón **«Desbloquear»** de
+`/admin` (`POST /admin/users/:username/trust`). Es un juicio sobre la persona, no sobre la cuenta,
+así que se puede retirar y surte efecto al momento. La verificación por SMS está pensada como
+tercera vía pero **no está hecha**: sin envío real no hay nada que verificar.
+
+`signup_signals` guarda `HMAC/SHA-256` de IP y User-Agent del registro. `GET /admin/users` marca
+`suspicious` cuando dos cuentas comparten ese rastro **y son amigas entre sí** (que es justo la
+forma del ataque). **No bloquea nada y no se le dice nunca al usuario**; es solo una señal para
+mirar con calma.
+
+⚠️ El DNI sigue existiendo en `users.dni_hash` para las cuentas viejas (con índice único parcial) y
+se les sigue pidiendo al recuperar contraseña; las nuevas no lo tienen y ahí basta el usuario,
+porque quien decide de verdad es el admin que aprueba a mano. Bases anteriores necesitan
+`migrations/011_apertura.sql`, que además marca de fiar a todas las cuentas que ya existían.
+
+## Enlace de invitación
+
+`GET /invite` da el código propio (se crea al pedirlo) y `GET /invite/:code` dice quién invita, sin
+sesión, para la pantalla de entrada. Quien se registra con `?invitacion=…` sale con esa amistad ya
+aceptada.
+
+**No es obligatorio y no debe serlo**: exigir invitación cerraría la red y mataría el boca a boca.
+Es un acelerador, no un muro — una lista sin nadie alrededor no le dice nada a quien acaba de
+llegar.
 
 ## Seguridad
 
@@ -428,9 +480,10 @@ del contenedor estrecho: eso fue lo que hacía que en escritorio se viera todo c
 
 ## Decisiones tomadas (y por qué)
 
-- **DNI en vez de SMS/email**: es un círculo familiar; el SMS cuesta dinero y el código de
-  verificación es una barrera real para los mayores de la familia. Nadie va a registrarse con el
-  DNI de otro, y con eso basta para el objetivo (que nadie se cree una segunda cuenta para espiar).
+- **Fuera el DNI del registro (agosto 2026)**: funcionaba en una familia porque había confianza
+  previa, pero para un desconocido pedir el documento es una barrera enorme, solo sirve en España y
+  mete de lleno en el RGPD. La defensa pasó a ser social (ver «Confianza»). El SMS se descartó
+  igual que antes: cuesta dinero y el código es una barrera real para los mayores.
 - **Sin email en todo el sistema**: por eso la recuperación de contraseña pasa por un admin humano
   en vez de por un enlace por correo. Es más lento, pero no añade superficie de ataque remota y
   para una familia el canal (una llamada) ya existe.

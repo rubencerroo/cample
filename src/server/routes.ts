@@ -64,6 +64,89 @@ async function areFriends(env: Env, a: string, b: string) {
   return !!r
 }
 
+/* ----------------------- confianza y cuentas duplicadas -------------------- */
+// En la web abierta no se puede impedir que alguien se cree una segunda cuenta, así que en vez de
+// intentarlo se hace que no sirva de nada: para ver lo que llevan los demás en una lista hay que
+// llevar unos días de amistad Y tener amigos en común, cosa que una cuenta recién hecha no puede
+// falsificar sola (haría falta que dos personas reales la aceptasen). El atajo es que un admin la
+// desbloquee a mano, o el teléfono verificado.
+//
+// ⚠️ Solo mira a QUIEN MIRA, nunca al dueño de la lista: el atacante es el propio dueño (se espía
+// su propia lista con una cuenta falsa), así que fiarse de él sería darle la llave de su casa.
+const DIAS_PARA_VER_RESERVAS = 7
+const AMIGOS_EN_COMUN_PARA_VER_RESERVAS = 2
+
+async function puedeVerReservas(env: Env, viewer: string, owner: string) {
+  const u = await env.DB.prepare('SELECT trust_level FROM users WHERE id = ?')
+    .bind(viewer)
+    .first<{ trust_level: number }>()
+  if (u?.trust_level) return true
+
+  const [x, y] = pair(viewer, owner)
+  const f = await env.DB.prepare(
+    'SELECT created_at FROM friendships WHERE user_a = ? AND user_b = ?',
+  )
+    .bind(x, y)
+    .first<{ created_at: number }>()
+  if (!f) return false
+  if (now() - f.created_at < DIAS_PARA_VER_RESERVAS * 86400) return false
+
+  const r = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM (
+       SELECT CASE WHEN user_a = ?1 THEN user_b ELSE user_a END AS amigo
+         FROM friendships WHERE user_a = ?1 OR user_b = ?1
+       INTERSECT
+       SELECT CASE WHEN user_a = ?2 THEN user_b ELSE user_a END
+         FROM friendships WHERE user_a = ?2 OR user_b = ?2
+     )`,
+  )
+    .bind(viewer, owner)
+    .first<{ n: number }>()
+  return (r?.n ?? 0) >= AMIGOS_EN_COMUN_PARA_VER_RESERVAS
+}
+
+/**
+ * La misma regla que `puedeVerReservas`, pero en SQL, para poder filtrar dentro de una consulta
+ * grande. Espera `?1` = quien mira, `?2` = el corte de antigüedad, y una tabla `g` con `user_id`
+ * (el dueño). Nada de subconsultas en FROM: no pueden mirar columnas de fuera.
+ */
+const VE_RESERVAS_SQL = `(
+  (SELECT trust_level FROM users WHERE id = ?1) = 1
+  OR (
+    (SELECT f.created_at FROM friendships f
+      WHERE f.user_a = MIN(?1, g.user_id) AND f.user_b = MAX(?1, g.user_id)) <= ?2
+    AND (SELECT COUNT(*) FROM friendships f1
+          WHERE (f1.user_a = ?1 OR f1.user_b = ?1)
+            AND EXISTS (SELECT 1 FROM friendships f2
+                         WHERE (f2.user_a = g.user_id OR f2.user_b = g.user_id)
+                           AND CASE WHEN f2.user_a = g.user_id THEN f2.user_b ELSE f2.user_a END
+                             = CASE WHEN f1.user_a = ?1 THEN f1.user_b ELSE f1.user_a END))
+        >= ${AMIGOS_EN_COMUN_PARA_VER_RESERVAS}
+  )
+)`
+
+/** Amistad ya aceptada para quien llega por un enlace de invitación. Falla en silencio. */
+async function aceptarInvitacion(c: Ctx, code: string, nuevo: string) {
+  const limpio = code.trim().toLowerCase()
+  if (!limpio) return
+  const inv = await c.env.DB.prepare('SELECT user_id FROM invites WHERE code = ?')
+    .bind(limpio)
+    .first<{ user_id: string }>()
+  if (!inv || inv.user_id === nuevo) return
+  const [x, y] = pair(inv.user_id, nuevo)
+  const t = now()
+  await c.env.DB.prepare(
+    'INSERT OR IGNORE INTO friendships (user_a, user_b, created_at) VALUES (?, ?, ?)',
+  )
+    .bind(x, y, t)
+    .run()
+  await c.env.DB.prepare('UPDATE invites SET uses = uses + 1 WHERE code = ?').bind(limpio).run()
+  const u = await c.env.DB.prepare('SELECT display_name FROM users WHERE id = ?')
+    .bind(nuevo)
+    .first<{ display_name: string }>()
+  await notify(c.env, inv.user_id, 'friend_accept', `${u?.display_name ?? 'Alguien'} ya está en Cample`, '/amigos')
+}
+
 /* --------------------------- sesión y protección --------------------------- */
 
 /**
@@ -186,7 +269,6 @@ app.post('/auth/register', async (c) => {
   const username = String(b.username ?? '').trim().toLowerCase()
   const displayName = String(b.displayName ?? '').trim()
   const password = String(b.password ?? '')
-  const doc = normalizeDocument(String(b.document ?? ''))
   const telRaw = String(b.phone ?? '').trim()
   const phone = telRaw ? normalizePhone(telRaw) : null
 
@@ -195,15 +277,13 @@ app.post('/auth/register', async (c) => {
   if (displayName.length < 2 || displayName.length > 40)
     return c.json({ error: 'Escribe tu nombre (2-40 caracteres)' }, 400)
   if (password.length < 8) return c.json({ error: 'La contraseña necesita al menos 8 caracteres' }, 400)
-  if (!doc) return c.json({ error: 'El DNI o NIE no es válido. Revísalo (número + letra)' }, 400)
   if (telRaw && !phone) return c.json({ error: 'Ese teléfono no parece válido. Escríbelo con los 9 dígitos.' }, 400)
 
-  // El límite se comprueba aquí, ya validado todo: equivocarse escribiendo el DNI o elegir un
-  // usuario que ya existe no debe gastar intentos (media familia comparte el mismo wifi).
+  // El límite se comprueba aquí, ya validado todo: elegir un usuario que ya existe no debe gastar
+  // intentos (media familia comparte el mismo wifi).
   if (!(await rateLimit(c.env, `reg:${ip}`, 20, 3600)))
     return c.json({ error: 'Demasiadas cuentas nuevas desde aquí. Prueba dentro de un rato.' }, 429)
 
-  const dniHash = await hmac(c.env.DNI_PEPPER, doc)
   const id = randomId(8)
   const t = now()
   try {
@@ -212,8 +292,8 @@ app.post('/auth/register', async (c) => {
       .map((s) => s.trim().toLowerCase())
       .includes(username)
     await c.env.DB.prepare(
-      'INSERT INTO users (id, username, display_name, bio, avatar_seed, password_hash, dni_hash, phone_hash, birthday, created_at, is_admin) ' +
-        'VALUES (?, ?, ?, "", ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO users (id, username, display_name, bio, avatar_seed, password_hash, phone_hash, birthday, created_at, is_admin, trust_level, trust_source, trusted_at) ' +
+        'VALUES (?, ?, ?, "", ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     )
       .bind(
         id,
@@ -221,22 +301,37 @@ app.post('/auth/register', async (c) => {
         displayName,
         randomId(4),
         await hashPassword(password),
-        dniHash,
         phone ? await hmac(c.env.DNI_PEPPER, phone) : null,
         normalizeBirthday(b.birthday),
         t,
         isAdmin ? 1 : 0,
+        // Un admin es alguien que ya conocemos; el resto empieza en 0 y va ganando confianza.
+        isAdmin ? 1 : 0,
+        isAdmin ? 'admin' : null,
+        isAdmin ? t : null,
       )
       .run()
   } catch (e: any) {
     const m = String(e?.message ?? '')
-    if (m.includes('users.dni_hash'))
-      return c.json({ error: 'Ya existe una cuenta con ese DNI. Solo se permite una por persona.' }, 409)
     if (m.includes('users.username')) return c.json({ error: 'Ese nombre de usuario ya está cogido' }, 409)
     if (m.includes('phone_hash') || m.includes('idx_users_phone'))
       return c.json({ error: 'Ese teléfono ya está puesto en otra cuenta' }, 409)
     throw e
   }
+  // Rastro mínimo para que un admin pueda detectar cuentas duplicadas. Ni la IP ni el navegador se
+  // guardan en claro, y esto no bloquea a nadie ni se le enseña nunca al usuario.
+  await c.env.DB.prepare(
+    'INSERT OR REPLACE INTO signup_signals (user_id, ip_hash, ua_hash, created_at) VALUES (?, ?, ?, ?)',
+  )
+    .bind(
+      id,
+      await sha256(ip + c.env.SESSION_PEPPER),
+      await sha256(String(c.req.header('User-Agent') ?? '') + c.env.SESSION_PEPPER),
+      t,
+    )
+    .run()
+  // Si viene por invitación, sale con un amigo ya aceptado: una lista vacía y sin nadie no vale nada.
+  await aceptarInvitacion(c, String(b.invite ?? ''), id)
   await startSession(c, id)
   const u = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first()
   return c.json({ user: publicUser(u) })
@@ -298,12 +393,15 @@ app.post('/auth/reset/request', async (c) => {
   const doc = normalizeDocument(String(b.document ?? ''))
   const username = String(b.username ?? '').trim().toLowerCase()
 
-  // Respuesta idéntica acierte o no: no confirmamos si un DNI está registrado.
-  if (doc) {
+  // Respuesta idéntica acierte o no: no confirmamos si una cuenta existe.
+  if (username) {
+    // Las cuentas antiguas siguen teniendo DNI y se les sigue pidiendo. Las nuevas no tienen, así
+    // que basta el usuario: quien decide de verdad es el admin que lo aprueba a mano.
     const u = await c.env.DB.prepare(
-      'SELECT id FROM users WHERE username = ? AND dni_hash = ? AND is_active = 1',
+      'SELECT id FROM users WHERE username = ? AND is_active = 1 ' +
+        'AND (dni_hash IS NULL OR dni_hash = ?)',
     )
-      .bind(username, await hmac(c.env.DNI_PEPPER, doc))
+      .bind(username, doc ? await hmac(c.env.DNI_PEPPER, doc) : '')
       .first<{ id: string }>()
     if (u) {
       const pending = await c.env.DB.prepare(
@@ -505,8 +603,18 @@ app.get('/admin/stats', auth, adminOnly, async (c) => {
 app.get('/admin/users', auth, adminOnly, async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT u.id, u.username, u.display_name, u.created_at, u.is_active, u.is_admin,
+            u.trust_level, u.trust_source,
             (SELECT COUNT(*) FROM gifts g WHERE g.user_id = u.id) AS gifts,
-            (SELECT COUNT(*) FROM friendships f WHERE f.user_a = u.id OR f.user_b = u.id) AS friends
+            (SELECT COUNT(*) FROM friendships f WHERE f.user_a = u.id OR f.user_b = u.id) AS friends,
+            -- Sospecha de cuenta duplicada: comparte rastro de registro con otra cuenta Y son
+            -- amigas entre sí (que es lo que hace falta para espiarse a uno mismo).
+            (SELECT COUNT(*) FROM signup_signals s1
+               JOIN signup_signals s2 ON s2.ip_hash = s1.ip_hash AND s2.ua_hash = s1.ua_hash
+                                     AND s2.user_id != s1.user_id
+              WHERE s1.user_id = u.id
+                AND EXISTS (SELECT 1 FROM friendships f
+                             WHERE f.user_a = MIN(u.id, s2.user_id)
+                               AND f.user_b = MAX(u.id, s2.user_id))) AS twins
        FROM users u ORDER BY u.created_at DESC`,
   ).all<any>()
   return c.json({
@@ -518,8 +626,27 @@ app.get('/admin/users', auth, adminOnly, async (c) => {
       isAdmin: !!u.is_admin,
       gifts: u.gifts,
       friends: u.friends,
+      trusted: !!u.trust_level,
+      trustSource: u.trust_source,
+      // Solo una señal para mirar con calma; no bloquea nada ni se le dice al interesado.
+      suspicious: u.twins > 0,
     })),
   })
+})
+
+// «Desbloquear»: para cuentas que un admin sabe que son de una persona real. Es un juicio sobre la
+// persona, así que se puede retirar y surte efecto al momento.
+app.post('/admin/users/:username/trust', auth, adminOnly, async (c) => {
+  const b = await c.req.json().catch(() => ({}))
+  const target = await userByUsername(c, c.req.param('username')!)
+  if (!target) return c.json({ error: 'No existe ese usuario' }, 404)
+  const on = b.trusted ? 1 : 0
+  await c.env.DB.prepare(
+    'UPDATE users SET trust_level = ?, trust_source = ?, trusted_at = ? WHERE id = ?',
+  )
+    .bind(on, on ? 'admin' : null, on ? now() : null, target.id)
+    .run()
+  return c.json({ ok: true })
 })
 
 // Desactivar deja la cuenta sin acceso pero conserva sus datos y sus reservas.
@@ -555,6 +682,8 @@ app.delete('/admin/users/:username', auth, adminOnly, async (c) => {
     c.env.DB.prepare('DELETE FROM notifications WHERE user_id = ?').bind(target.id),
     c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(target.id),
     c.env.DB.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(target.id),
+    c.env.DB.prepare('DELETE FROM signup_signals WHERE user_id = ?').bind(target.id),
+    c.env.DB.prepare('DELETE FROM invites WHERE user_id = ?').bind(target.id),
     c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(target.id),
   ])
   return c.json({ ok: true })
@@ -1312,6 +1441,37 @@ app.post('/gifts/:id/received', auth, async (c) => {
   return c.json({ ok: true })
 })
 
+/* --------------------------- enlace de invitación -------------------------- */
+// No es obligatorio para entrar (eso mataría el boca a boca), pero quien llega por aquí sale con
+// un amigo ya aceptado: una lista vacía y sin nadie alrededor no le dice nada a nadie.
+
+app.get('/invite', auth, async (c) => {
+  const me = c.get('userId')
+  let row = await c.env.DB.prepare('SELECT code FROM invites WHERE user_id = ?')
+    .bind(me)
+    .first<{ code: string }>()
+  if (!row) {
+    const code = randomId(10).toLowerCase()
+    await c.env.DB.prepare('INSERT INTO invites (code, user_id, created_at) VALUES (?, ?, ?)')
+      .bind(code, me, now())
+      .run()
+    row = { code }
+  }
+  return c.json({ code: row.code })
+})
+
+/** Quién invita, para poder enseñarlo en el registro. Sin sesión: es la pantalla de entrada. */
+app.get('/invite/:code', async (c) => {
+  const row = await c.env.DB.prepare(
+    'SELECT u.* FROM invites i JOIN users u ON u.id = i.user_id ' +
+      'WHERE i.code = ? AND u.is_active = 1',
+  )
+    .bind(c.req.param('code')!.toLowerCase())
+    .first<any>()
+  if (!row) return c.json({ user: null })
+  return c.json({ user: publicUser(row) })
+})
+
 /* ------------------------- lista de otra persona -------------------------- */
 
 // Unidades ocupadas: las que se lleva cada persona más una por cada colecta viva.
@@ -1362,22 +1522,28 @@ app.get('/lists/:username', auth, async (c) => {
 
   const react = await reactionsOf(c, results.map((g) => g.id))
   const yo = await c.env.DB.prepare('SELECT username FROM users WHERE id = ?').bind(me).first<any>()
+  // Amistad recién hecha: se ve la lista entera, pero no lo que llevan los demás. Se filtra aquí,
+  // en el servidor, no escondiéndolo en la pantalla.
+  const verReservas = await puedeVerReservas(c.env, me, other.id)
 
   return c.json({
     user: publicUser(other),
+    canSeeReservations: verReservas,
     gifts: results.map((g) => {
       const taken = g.reserved + (g.group_id ? 1 : 0)
       return {
         ...ownerView(g),
         ...reactionPayload(react[g.id], yo.username),
         // Cuántas unidades quedan y si la he cogido yo. Nunca decimos quién más.
-        taken,
-        remaining: Math.max(0, g.quantity - taken),
+        taken: verReservas ? taken : 0,
+        remaining: verReservas ? Math.max(0, g.quantity - taken) : g.quantity,
+        // Lo mío sí lo veo siempre: si no, no podría saber qué he cogido yo.
         reservedByMe: g.mine > 0,
         myUnits: g.mine,
         // Cuántas personas hay señaladas, nunca quiénes son.
         audienceCount: g.visibility === 'all' ? 0 : g.aud_n,
-        group: g.group_id
+        // Que exista una colecta ya dice que alguien se está encargando: se oculta igual.
+        group: g.group_id && (verReservas || g.group_mine > 0)
           ? {
               id: g.group_id,
               status: g.group_status,
@@ -1398,6 +1564,10 @@ app.post('/gifts/:id/reserve', auth, async (c) => {
   if (!(await areFriends(c.env, me, g.user_id))) return c.json({ error: 'No sois amigos' }, 403)
   if (!(await canSeeGift(c.env, g, me))) return c.json({ error: 'No encontrado' }, 404)
   if (g.is_received) return c.json({ error: 'Ese regalo ya está recibido' }, 400)
+  // Sin esto el filtro de la lista se saltaría a base de probar: los regalos que respondiesen «ya
+  // está reservado» serían justo los que estábamos ocultando.
+  if (!(await puedeVerReservas(c.env, me, g.user_id)))
+    return c.json({ error: 'Todavía no puedes reservar en esta lista' }, 403)
 
   const b = await c.req.json().catch(() => ({}))
   // Las unidades que ya tenía cogidas no cuentan como ocupadas: puede subir o bajar su cantidad.
@@ -1461,6 +1631,15 @@ async function groupAccess(c: Ctx, groupId: string, requireMember = false): Prom
     return c.json({ error: 'No puedes ver esta colecta' }, 403)
   // Si el regalo se ha restringido y ya no lo ve, tampoco existe la colecta para esta persona.
   if (!(await canSeeGift(c.env, gift, me))) return c.json({ error: 'Esa colecta no existe' }, 404)
+  // Amistad demasiado nueva: la colecta tampoco existe para esta persona (404, nunca 403). Quien ya
+  // está dentro sigue entrando: se le metió cuando sí podía.
+  const yaDentro = await c.env.DB.prepare(
+    'SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?',
+  )
+    .bind(groupId, me)
+    .first()
+  if (!yaDentro && !(await puedeVerReservas(c.env, me, gift.user_id)))
+    return c.json({ error: 'Esa colecta no existe' }, 404)
   // Si quien organizaba ya no está dentro (se fue o dejó de ser amigo), toma el relevo el más antiguo.
   const orgStillIn = await c.env.DB.prepare(
     'SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?',
@@ -1597,6 +1776,8 @@ app.post('/gifts/:id/group', auth, async (c) => {
   if (!(await areFriends(c.env, me, gift.user_id))) return c.json({ error: 'No sois amigos' }, 403)
   if (!(await canSeeGift(c.env, gift, me))) return c.json({ error: 'No encontrado' }, 404)
   if (gift.is_received) return c.json({ error: 'Ese regalo ya está recibido' }, 400)
+  if (!(await puedeVerReservas(c.env, me, gift.user_id)))
+    return c.json({ error: 'Todavía no puedes reservar en esta lista' }, 403)
   if ((await unitsTaken(c.env, gift.id)) >= gift.quantity)
     return c.json({ error: 'Ese regalo ya está cogido' }, 409)
 
@@ -1838,11 +2019,12 @@ app.get('/activity', auth, async (c) => {
        JOIN users u ON u.id = g.user_id
       WHERE gr.status IN ('open', 'bought') AND g.user_id IN (SELECT id FROM amigos)
         AND u.is_active = 1 AND g.is_archived = 0 AND ${VISIBLE_SQL}
+        AND ${VE_RESERVAS_SQL}
 
      ORDER BY at DESC
      LIMIT 30`,
   )
-    .bind(me)
+    .bind(me, now() - DIAS_PARA_VER_RESERVAS * 86400)
     .all<any>()
 
   return c.json({

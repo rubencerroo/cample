@@ -245,6 +245,9 @@ function Users({ me }: { me: string }) {
   return (
     <div className="space-y-3">
       <ErrorBox>{error}</ErrorBox>
+      <p className="rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-600">
+        {t('admin.trustHint')}
+      </p>
       {list.loading ? (
         <Spinner />
       ) : (
@@ -257,6 +260,12 @@ function Users({ me }: { me: string }) {
                 {!u.isActive && (
                   <span className="chip bg-slate-200 text-slate-600">{t('admin.disabledChip')}</span>
                 )}
+                {u.trusted && (
+                  <span className="chip bg-green-100 text-green-700">{t('admin.trustedChip')}</span>
+                )}
+                {u.suspicious && (
+                  <span className="chip bg-amber-100 text-amber-800">{t('admin.suspiciousChip')}</span>
+                )}
               </div>
               <p className="text-sm text-slate-500">
                 {t('admin.userLine', {
@@ -268,6 +277,20 @@ function Users({ me }: { me: string }) {
               </p>
               {u.username !== me && (
                 <div className="flex flex-wrap gap-2">
+                  {/* Es un juicio sobre la persona, no sobre la cuenta: por eso se puede retirar. */}
+                  <button
+                    className={u.trusted ? 'btn-ghost !py-2 !px-4 !text-sm' : 'btn-primary !py-2 !px-4 !text-sm'}
+                    onClick={async () => {
+                      if (!u.trusted) return act(api.setTrusted(u.username, true))
+                      const ok = await confirmar({
+                        title: t('admin.confirmUntrust', { name: u.displayName }),
+                        confirmLabel: t('admin.untrust'),
+                      })
+                      if (ok) act(api.setTrusted(u.username, false))
+                    }}
+                  >
+                    {u.trusted ? t('admin.untrust') : t('admin.trust')}
+                  </button>
                   <button
                     className="btn-ghost !py-2 !px-4 !text-sm"
                     onClick={() => act(api.setUserActive(u.username, !u.isActive))}

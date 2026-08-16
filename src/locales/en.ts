@@ -42,6 +42,7 @@ export const en: Dict = {
   'auth.password': 'Password',
   'auth.document': 'ID number (DNI or NIE)',
   'auth.documentHint': 'It is only used to check it is really you. It is never stored as such and nobody sees it.',
+  'auth.invitedBy': '{nombre} invited you. As soon as you sign up you will be friends.',
   'auth.phone': 'Phone (optional)',
   'auth.phoneHint': 'It lets your family find you from their contacts. Nobody sees your number.',
   'auth.forgot': "I can't remember my password",
@@ -50,6 +51,7 @@ export const en: Dict = {
     'Ask for it here and tell whoever looks after Cample in your family. They will give you a code to set a new password.',
   'auth.reset.username': 'Your username',
   'auth.reset.document': 'Your ID number',
+  'auth.reset.documentHint': 'Only if you gave it when you signed up. Otherwise leave it empty.',
   'auth.reset.sent':
     'Request sent. When they give you the code, type it here along with your new password.',
   'auth.reset.code': 'Code',
@@ -149,6 +151,8 @@ export const en: Dict = {
 
   'friendList.notice':
     'If you reserve a present, {name} finds out nothing. Everyone else only sees that it is taken, not by whom.',
+  'friendList.waitingNotice':
+    'You cannot yet see what people have already taken on this list, and you cannot reserve here. It opens on its own once you have been friends for a while.',
   'friendList.reactionNotice':
     'If you tap a heart, {name} will see it: it is a way of saying you like what they asked for.',
   'friendList.nudgeText': '{name} has not listed many ideas. You can ask them to add more.',
@@ -218,6 +222,13 @@ export const en: Dict = {
   'group.messagePlaceholder': 'Write a message…',
 
   'friends.title': 'Friends',
+  'friends.inviteTitle': 'Invite someone',
+  'friends.inviteText':
+    'Send them this link. Once they sign up you will already be connected, with nobody having to search.',
+  'friends.inviteShare': 'Share link',
+  'friends.inviteCopy': 'Copy link',
+  'friends.inviteCopied': 'Link copied',
+  'friends.inviteMessage': "I'm adding you on Cample so nobody buys me the same thing twice: {url}",
   'friends.search': 'Find people',
   'friends.searchPlaceholder': 'Name or username',
   'friends.results': 'Results',
@@ -274,7 +285,8 @@ export const en: Dict = {
   'settings.birthday': 'Birthday (optional)',
   'settings.birthdayPlaceholder': '24-12 (day-month)',
   'settings.birthdayHintSet': 'Your friends will see that you celebrate it on {date}.',
-  'settings.birthdayHint': 'Write the day and the month, like this: 24-12. Your friends will see it on your list.',
+  'settings.birthdayHint':
+    'Type four numbers: the day and the month. For example 2412 for 24 December. The dash appears on its own.',
   'settings.language': 'Language',
   'settings.languageHint': 'It follows your phone automatically, but you can change it here whenever you like.',
   'settings.phoneTitle': 'Your phone',
@@ -414,6 +426,14 @@ export const en: Dict = {
   'admin.userLine': '@{user} · {gifts} presents · {friends} friends · since {date}',
   'admin.disable': 'Disable',
   'admin.enable': 'Re-enable',
+  'admin.trustedChip': 'Unlocked',
+  'admin.suspiciousChip': 'Check',
+  'admin.trust': 'Unlock',
+  'admin.untrust': 'Remove unlock',
+  'admin.trustHint':
+    'Only unlock people you know are real: they will see what has already been taken on their friends lists from day one.',
+  'admin.confirmUntrust':
+    'Remove the unlock for {name}? They will have to wait again on the lists of their new friends.',
   'admin.confirmDeleteUser': "Delete {name}'s account? Their presents go too and it cannot be undone.",
   'admin.bug': 'Bug',
   'admin.idea': 'Idea',

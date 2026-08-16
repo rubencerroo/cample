@@ -5,6 +5,48 @@ import { Avatar, Empty, ErrorBox, Spinner, useAsync, useDialogos } from '../ui'
 import { useT } from '../i18n'
 import { ICON, Icon } from '../icons'
 
+/**
+ * Enlace propio de invitación. No hace falta para entrar en Cample, pero quien llega por aquí sale
+ * con un amigo ya aceptado, y una lista sin nadie alrededor no le dice nada a nadie.
+ */
+function Invitar() {
+  const t = useT()
+  const invite = useAsync(() => api.myInvite(), [])
+  const [copiado, setCopiado] = useState(false)
+  if (!invite.data) return null
+
+  const url = `${location.origin}/?invitacion=${invite.data.code}`
+  const texto = t('friends.inviteMessage', { url })
+  // En escritorio no existe el menú de compartir del sistema: allí se copia y ya.
+  const puedeCompartir = typeof navigator.share === 'function'
+
+  async function compartir() {
+    if (puedeCompartir) {
+      await navigator.share({ text: texto }).catch(() => {})
+      return
+    }
+    await navigator.clipboard.writeText(url)
+    setCopiado(true)
+    setTimeout(() => setCopiado(false), 2500)
+  }
+
+  return (
+    <div className="card space-y-3">
+      <h2 className="font-bold">{t('friends.inviteTitle')}</h2>
+      <p className="text-sm text-slate-600">{t('friends.inviteText')}</p>
+      <p className="break-all rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-700">{url}</p>
+      <button className="btn-primary inline-flex items-center gap-2" onClick={compartir}>
+        <Icon icon={ICON.enlace} size={20} />
+        {copiado
+          ? t('friends.inviteCopied')
+          : puedeCompartir
+            ? t('friends.inviteShare')
+            : t('friends.inviteCopy')}
+      </button>
+    </div>
+  )
+}
+
 export default function Friends() {
   const t = useT()
   const { confirmar } = useDialogos()
@@ -41,6 +83,8 @@ export default function Friends() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-extrabold">{t('friends.title')}</h1>
+
+      <Invitar />
 
       <div>
         <label className="label" htmlFor="q">{t('friends.search')}</label>
