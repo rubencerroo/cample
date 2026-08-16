@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { getLang, localeOf, translate } from './i18n'
+import { ICON, Icon } from './icons'
 
 /** Traducción fuera de React, para las funciones sueltas de este fichero. */
 const tr = (key: string, vars?: Record<string, string | number>) => translate(getLang(), key, vars)
@@ -203,8 +204,9 @@ export function VisibilityChip({
   }
 
   return (
-    <span className="chip bg-violet-100 text-violet-800" title={tr('visibility.title')}>
-      🔒 {text}
+    <span className="chip inline-flex items-center gap-1 bg-violet-100 text-violet-800" title={tr('visibility.title')}>
+      <Icon icon={ICON.privacidad} size={14} />
+      {text}
     </span>
   )
 }

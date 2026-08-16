@@ -1,26 +1,27 @@
 import { useState } from 'react'
 import { api } from '../api'
 import { LANGS, useI18n, useT } from '../i18n'
+import { ICON, Icon, type IconoDatos } from '../icons'
 
 /** Súbela solo si la guía cambia de verdad: quien tenga un número menor la volverá a ver. */
 export const ONBOARDING_VERSION = 5
 
-type Paso = { icono: string; clave: string; puntos: number; idiomas?: boolean }
+type Paso = { icono: IconoDatos; clave: string; puntos: number; idiomas?: boolean }
 
 /** Los textos viven en los diccionarios (`onboarding.N.*`); aquí solo el orden y los iconos. */
 const PASOS: Paso[] = [
   // El primero es el de idioma: si alguien abre la app en un idioma que no es el suyo, lo
   // primero que ve es cómo arreglarlo, no nueve pantallas que no entiende.
-  { icono: '\u{1F310}', clave: '0', puntos: 1, idiomas: true },
-  { icono: '\u{1F381}', clave: '1', puntos: 2 },
-  { icono: '\u{1F4DD}', clave: '2', puntos: 3 },
-  { icono: '\u{1F512}', clave: '3', puntos: 3 },
-  { icono: '4\uFE0F\u20E3', clave: '4', puntos: 2 },
-  { icono: '\u{1F92B}', clave: '5', puntos: 2 },
-  { icono: '\u{1F64C}', clave: '6', puntos: 3 },
-  { icono: '\u{1F91D}', clave: '7', puntos: 2 },
-  { icono: '\u{1F465}', clave: '8', puntos: 2 },
-  { icono: '\u{1F4AC}', clave: '9', puntos: 2 },
+  { icono: ICON.idioma, clave: '0', puntos: 1, idiomas: true },
+  { icono: ICON.lista, clave: '1', puntos: 2 },
+  { icono: ICON.apuntar, clave: '2', puntos: 3 },
+  { icono: ICON.privacidad, clave: '3', puntos: 3 },
+  { icono: ICON.unidades, clave: '4', puntos: 2 },
+  { icono: ICON.oculto, clave: '5', puntos: 2 },
+  { icono: ICON.regalar, clave: '6', puntos: 3 },
+  { icono: ICON.colecta, clave: '7', puntos: 2 },
+  { icono: ICON.amigos, clave: '8', puntos: 2 },
+  { icono: ICON.buzon, clave: '9', puntos: 2 },
 ]
 
 export default function Onboarding({ onClose }: { onClose: () => void }) {
@@ -40,8 +41,8 @@ export default function Onboarding({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 backdrop-blur-sm sm:items-center sm:p-4">
       <div className="flex max-h-[94dvh] w-full max-w-lg flex-col rounded-t-3xl bg-white sm:rounded-3xl">
         <div className="flex-1 overflow-y-auto p-6 text-center">
-          <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-brand-50 text-5xl">
-            <span aria-hidden>{paso.icono}</span>
+          <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+            <Icon icon={paso.icono} size={48} />
           </div>
           <h2 className="text-2xl font-extrabold">{t(`onboarding.${paso.clave}.title`)}</h2>
           <p className="mt-2 text-lg leading-relaxed text-slate-600">
@@ -71,9 +72,7 @@ export default function Onboarding({ onClose }: { onClose: () => void }) {
             <ul className="mt-4 space-y-2 text-left">
               {puntos.map((p) => (
                 <li key={p} className="flex items-start gap-2 rounded-2xl bg-slate-50 px-4 py-3">
-                  <span className="text-brand-500" aria-hidden>
-                    ✓
-                  </span>
+                  <Icon icon={ICON.check} size={20} className="shrink-0 text-brand-500" />
                   <span className="text-slate-700">{p}</span>
                 </li>
               ))}

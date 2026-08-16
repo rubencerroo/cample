@@ -63,7 +63,7 @@ export default function MyList() {
           <p className="text-slate-600">{t('myList.sub')}</p>
         </div>
         <button className="btn-primary shrink-0 inline-flex items-center gap-2" onClick={() => setEditing('new')}>
-          <Icon icon={ICON.lista} size={20} />
+          <Icon icon={ICON.anadir} size={20} />
           {t('myList.add')}
         </button>
       </div>

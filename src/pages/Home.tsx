@@ -3,6 +3,7 @@ import { Activity, api } from '../api'
 import { useAuth } from '../App'
 import { Avatar, Empty, ErrorBox, Spinner, birthdayLabel, daysUntilBirthday, money, useAsync } from '../ui'
 import { localeOf, useT } from '../i18n'
+import { ICON, Icon } from '../icons'
 
 export default function Home() {
   const { user } = useAuth()
@@ -67,7 +68,7 @@ export default function Home() {
               return (
                 <li key={f.id}>
                   <Link to={`/lista/${f.username}`} className="card flex items-center gap-3 hover:border-brand-300">
-                    <span className="text-2xl" aria-hidden>🎂</span>
+                    <Icon icon={ICON.cumple} size={26} className="shrink-0 text-brand-600" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold">{f.displayName}</span>
                       <span className="block text-sm text-slate-500">{birthdayLabel(f.birthday)}</span>
@@ -132,7 +133,8 @@ function ActivityCard({ item }: { item: Activity }) {
         : t('home.actGroup', { name: nombre })
 
   const to = item.kind === 'group' ? `/colecta/${item.ref}` : `/lista/${item.user.username}`
-  const icono = item.kind === 'gift' ? '🎁' : item.kind === 'received' ? '✅' : '🤝'
+  const icono =
+    item.kind === 'gift' ? ICON.lista : item.kind === 'received' ? ICON.recibido : ICON.colecta
 
   return (
     <Link to={to} className="card block hover:border-brand-300">
@@ -152,8 +154,8 @@ function ActivityCard({ item }: { item: Activity }) {
         {item.imageUrl ? (
           <img src={item.imageUrl} alt="" className="h-16 w-16 shrink-0 rounded-2xl object-cover" loading="lazy" />
         ) : (
-          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-3xl" aria-hidden>
-            {icono}
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+            <Icon icon={icono} size={30} />
           </span>
         )}
         <div className="min-w-0 flex-1">

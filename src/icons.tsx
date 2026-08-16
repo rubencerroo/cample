@@ -18,6 +18,7 @@
  */
 import { MorphIcon } from 'morphicons/react'
 import {
+  Boxes,
   Cake,
   Check,
   CircleHelp,
@@ -25,8 +26,10 @@ import {
   ChevronUp,
   CircleCheck,
   Clipboard,
+  EyeOff,
   Gift,
   Globe,
+  HandHeart,
   Handshake,
   Heart,
   House,
@@ -35,7 +38,9 @@ import {
   Link as LinkIcon,
   Lock,
   MessageSquare,
+  NotebookPen,
   Pencil,
+  Plus,
   Search,
   Settings,
   Shield,
@@ -63,6 +68,7 @@ export const ICON = {
   deshacer: Undo2,
   colecta: Handshake,
   idea: Lightbulb,
+  anadir: Plus,
   editar: Pencil,
   borrar: Trash2,
   enlace: LinkIcon,
@@ -82,9 +88,15 @@ export const ICON = {
   ayuda: CircleHelp,
   buzon: MessageSquare,
   privacidad: Lock,
+  // Guía de bienvenida
+  apuntar: NotebookPen,
+  unidades: Boxes,
+  oculto: EyeOff,
+  regalar: HandHeart,
 } as const
 
-type Datos = (typeof ICON)[keyof typeof ICON]
+/** Los datos de un icono, para tipar props que reciben uno. */
+export type IconoDatos = (typeof ICON)[keyof typeof ICON]
 
 export function Icon({
   icon,
@@ -93,7 +105,7 @@ export function Icon({
   className,
 }: {
   /** Pasa dos valores distintos según el estado y la transición se anima sola. */
-  icon: Datos
+  icon: IconoDatos
   size?: number
   /** Solo si el icono es la única pista de lo que hace; si hay texto al lado, déjalo vacío. */
   label?: string

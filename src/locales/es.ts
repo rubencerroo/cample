@@ -89,7 +89,7 @@ export const es = {
   'myList.title': 'Mi lista',
   'myList.sub':
     'Apunta lo que te gustaría. Puedes ser genérico («una camiseta blanca») o exacto (con enlace, talla y precio).',
-  'myList.add': '+ Añadir',
+  'myList.add': 'Añadir',
   'myList.secret':
     '🤫 Aquí nunca verás si alguien ha reservado un regalo ni quién. Es a propósito: así no se estropea la sorpresa. Marca «Ya lo tengo» cuando lo recibas.',
   'myList.veryExcited': 'Me hace mucha ilusión',
@@ -116,7 +116,7 @@ export const es = {
   'gift.notesPlaceholder': 'Talla, color, marca, dónde comprarlo… o «me vale cualquiera»',
   'gift.url': 'Enlace (opcional)',
   'gift.paste': 'Pegar',
-  'gift.fillFromLink': '✨ Rellenar solo desde el enlace',
+  'gift.fillFromLink': 'Rellenar solo desde el enlace',
   'gift.reading': 'Leyendo la página…',
   'gift.clipboardEmpty': 'No hay ningún enlace copiado. Copia la dirección y vuelve a probar.',
   'gift.photoFromLink': 'Foto sacada del enlace',
@@ -167,7 +167,7 @@ export const es = {
   'friendList.iGiveIt': 'Lo regalo yo',
   'friendList.alreadyTaken': 'Ya está cogido',
   'friendList.dropIt': 'Ya no lo llevo',
-  'friendList.groupGift': '🤝 Regalo en grupo',
+  'friendList.groupGift': 'Regalo en grupo',
   'friendList.groupBought': 'Comprado en grupo',
   'friendList.groupRunning': 'Regalo en grupo en marcha',
   'friendList.groupIn': 'estás dentro',

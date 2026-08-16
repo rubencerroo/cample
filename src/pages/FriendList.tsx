@@ -44,7 +44,8 @@ export default function FriendList() {
           <p className="text-slate-500">@{user.username}</p>
           {birthdayLabel(user.birthday) && (
             <p className="mt-0.5 text-sm font-medium text-brand-700">
-              🎂 {birthdayLabel(user.birthday)}
+              <Icon icon={ICON.cumple} size={18} className="mr-1 inline-block align-[-3px]" />
+              {birthdayLabel(user.birthday)}
               {(() => {
                 const d = daysUntilBirthday(user.birthday)
                 if (d === null) return null
@@ -200,7 +201,10 @@ export default function FriendList() {
           </summary>
           <ul className="mt-3 space-y-1 text-slate-500">
             {received.map((g) => (
-              <li key={g.id}>✅ {g.title}</li>
+              <li key={g.id} className="flex items-center gap-2">
+                <Icon icon={ICON.recibido} size={18} className="shrink-0 text-green-600" />
+                {g.title}
+              </li>
             ))}
           </ul>
         </details>

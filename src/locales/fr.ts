@@ -91,7 +91,7 @@ export const fr: Dict = {
   'myList.title': 'Ma liste',
   'myList.sub':
     'Note ce qui te ferait plaisir. Tu peux rester vague (« un t-shirt blanc ») ou être précis (avec le lien, la taille et le prix).',
-  'myList.add': '+ Ajouter',
+  'myList.add': 'Ajouter',
   'myList.secret':
     "🤫 Ici tu ne verras jamais si quelqu'un a réservé un cadeau, ni qui. C'est fait exprès : la surprise reste entière. Coche « Je l'ai reçu » quand il arrive.",
   'myList.veryExcited': 'Ça me ferait très plaisir',
@@ -119,7 +119,7 @@ export const fr: Dict = {
   'gift.notesPlaceholder': 'Taille, couleur, marque, où l\'acheter… ou « n\'importe lequel »',
   'gift.url': 'Lien (facultatif)',
   'gift.paste': 'Coller',
-  'gift.fillFromLink': '✨ Remplir depuis le lien',
+  'gift.fillFromLink': 'Remplir depuis le lien',
   'gift.reading': 'Lecture de la page…',
   'gift.clipboardEmpty': 'Aucun lien copié. Copie l’adresse et réessaie.',
   'gift.photoFromLink': 'Photo prise sur le lien',
@@ -171,7 +171,7 @@ export const fr: Dict = {
   'friendList.iGiveIt': "C'est moi qui l'offre",
   'friendList.alreadyTaken': 'Déjà pris',
   'friendList.dropIt': 'Je ne le prends plus',
-  'friendList.groupGift': '🤝 Cadeau groupé',
+  'friendList.groupGift': 'Cadeau groupé',
   'friendList.groupBought': 'Acheté à plusieurs',
   'friendList.groupRunning': 'Cadeau groupé en cours',
   'friendList.groupIn': 'tu en fais partie',

@@ -88,7 +88,7 @@ export const en: Dict = {
   'myList.title': 'My list',
   'myList.sub':
     'Write down what you would like. You can be vague ("a white t-shirt") or exact (with a link, size and price).',
-  'myList.add': '+ Add',
+  'myList.add': 'Add',
   'myList.secret':
     "🤫 You will never see here whether someone has reserved a present, or who. That's on purpose: it keeps the surprise. Mark \"I got it\" when it arrives.",
   'myList.veryExcited': "I'd love this one",
@@ -115,7 +115,7 @@ export const en: Dict = {
   'gift.notesPlaceholder': 'Size, colour, brand, where to buy it… or "any one will do"',
   'gift.url': 'Link (optional)',
   'gift.paste': 'Paste',
-  'gift.fillFromLink': '✨ Fill it in from the link',
+  'gift.fillFromLink': 'Fill it in from the link',
   'gift.reading': 'Reading the page…',
   'gift.clipboardEmpty': 'No link copied. Copy the address and try again.',
   'gift.photoFromLink': 'Photo taken from the link',
@@ -166,7 +166,7 @@ export const en: Dict = {
   'friendList.iGiveIt': "I'll get this one",
   'friendList.alreadyTaken': 'Already taken',
   'friendList.dropIt': "I'm not getting it",
-  'friendList.groupGift': '🤝 Group present',
+  'friendList.groupGift': 'Group present',
   'friendList.groupBought': 'Bought as a group',
   'friendList.groupRunning': 'Group present under way',
   'friendList.groupIn': "you're in",

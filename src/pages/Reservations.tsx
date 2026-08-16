@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { Empty, ErrorBox, Spinner, money, useAsync } from '../ui'
 import { useT } from '../i18n'
+import { ICON, Icon } from '../icons'
 
 export default function Reservations() {
   const list = useAsync(() => api.reservations(), [])
@@ -22,9 +23,7 @@ export default function Reservations() {
             {groups.data.groups.map((g) => (
               <li key={g.id}>
                 <Link to={`/colecta/${g.id}`} className="card flex items-center gap-3 hover:border-brand-300">
-                  <span className="text-2xl" aria-hidden>
-                    🤝
-                  </span>
+                  <Icon icon={ICON.colecta} size={28} className="shrink-0 text-brand-600" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-bold">{g.title}</span>
                     <span className="block text-sm text-slate-500">
