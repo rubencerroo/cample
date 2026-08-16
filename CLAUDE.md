@@ -534,7 +534,17 @@ Hechos y en marcha. Los detalles y el porqué de cada decisión están en
   semana)`, y seis clases de mensaje que se van barajando con claves en `push_sent` para no
   repetirse. Si un día no hay nada que contar, no se manda nada.
 - El permiso **solo se pregunta una vez en la vida**: nunca lanzar el cuadro del navegador sin
-  enseñar antes `AvisosPrompt`. En iPhone no existe si la app no está instalada.
+  enseñar antes `AvisosPrompt`. En iPhone no existe si la app no está instalada. Y **desde la web no
+  se puede desbloquear** a quien dijo que no: Ajustes solo puede explicar dónde se cambia en cada
+  sistema, que es justo lo que hace. El botón de «mandarme un aviso de prueba» (`POST /push/test`)
+  está para quitar la duda de si funciona.
+- ⚠️ Quien ya tenía la app instalada arrastra el **service worker viejo**, que no sabe recibir
+  avisos: `main.tsx` y `activarPush()` fuerzan `registration.update()`. Sin eso, el aviso llega y no
+  se ve nada.
+- **Aviso a mano del admin** (`POST /admin/notify`, pestaña «Avisos» de `/admin`): a todos o a
+  personas concretas, 200 caracteres. Es la única forma de contarle algo a la familia, porque no hay
+  email. El formulario recuerda que eso sale en una pantalla de bloqueo y que ahí no se habla de
+  regalos ni de quién lleva qué.
 
 ⚠️ Bases anteriores necesitan `migrations/014_push.sql`.
 

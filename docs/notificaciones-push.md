@@ -90,7 +90,9 @@ desde la app. Por eso:
 - Va el último de la cola de ventanas: guía → teléfono → instalar → avisos.
 - **En iPhone solo funciona con la app añadida a la pantalla de inicio** (iOS 16.4+), así que allí no
   se ofrece hasta que está instalada.
-- Hay interruptor en Ajustes desde el primer día. Al cerrar sesión se apaga la suscripción de ese
+- Si ya dijo que no, **la app no puede hacer nada**: el permiso solo se cambia en los ajustes del
+  navegador o del sistema. Ajustes enseña dónde está en Android, iPhone y escritorio.
+- Hay interruptor en Ajustes desde el primer día, con un botón de aviso de prueba (`/push/test`). Al cerrar sesión se apaga la suscripción de ese
   aparato (tablet compartida de casa).
 
 ## Secretos
@@ -102,6 +104,12 @@ Copia en `secrets.local.txt` (fuera de git).
 pedir el permiso a todo el mundo, que es justo lo que solo se puede hacer una vez. `CRON_SECRET`
 tiene que ser el mismo en Pages y en el Worker de `cron/`. Sin claves puestas, el push no existe y
 la app no lo ofrece en ningún sitio: nada revienta.
+
+## Avisos escritos a mano
+
+`POST /admin/notify` (pestaña «Avisos» de `/admin`): a todo el mundo o a personas concretas, 200
+caracteres, siempre con enlace a Inicio. Es la única vía para contarle algo a la familia —no hay
+email en Cample—, y por eso el formulario avisa de que eso se lee en una pantalla de bloqueo.
 
 ## Probarlo
 
