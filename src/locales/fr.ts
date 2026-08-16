@@ -63,7 +63,7 @@ export const fr: Dict = {
   'auth.reset.doneText': 'Tu peux maintenant te connecter avec le nouveau.',
   'auth.reset.goLogin': 'Aller à la connexion',
 
-  'home.hello': 'Bonjour, {name} 👋',
+  'home.hello': 'Bonjour, {name}',
   'home.sub': 'Choisis à qui tu veux offrir quelque chose.',
   'home.news': 'Nouveautés',
   'home.markRead': 'Marquer comme lu',
@@ -158,7 +158,7 @@ export const fr: Dict = {
     'Si tu appuies sur un cœur, {name} le verra : c’est une façon de dire que son idée te plaît.',
   'friendList.nudgeText': '{name} n’a pas noté beaucoup d’idées. Tu peux lui demander d’en ajouter.',
   'friendList.nudgeButton': 'Lui demander de noter quelque chose',
-  'friendList.nudgeSent': 'Message envoyé ✅',
+  'friendList.nudgeSent': 'Message envoyé',
   'friendList.birthdayToday': " · c'est aujourd'hui !",
   'friendList.birthdayTomorrow': ' · demain !',
   'friendList.birthdayIn': ' · dans {n} jours',
@@ -241,7 +241,7 @@ export const fr: Dict = {
   'friends.confirmRemove': 'Retirer {name} de tes amis ?',
   'friends.emptyTitle': "Tu n'as pas encore d'amis",
   'friends.emptyHint': "Cherche-les ci-dessus par leur nom d'utilisateur.",
-  'friends.fromContacts': '📇 Chercher dans mes contacts',
+  'friends.fromContacts': 'Chercher dans mes contacts',
   'friends.fromContactsNone': "Aucun des contacts choisis n'est encore sur Cample.",
   'friends.inContacts': 'Dans tes contacts',
   'friends.contactsError': "Impossible d'ouvrir le carnet d'adresses",
@@ -306,7 +306,7 @@ export const fr: Dict = {
   'settings.feedbackTitle': "Un problème ou une idée ?",
   'settings.feedbackText':
     "Dis-le-nous et nous le lirons. Ça marche pour les pannes (« ça ne me laisse pas mettre la photo ») comme pour les idées nouvelles.",
-  'settings.feedbackButton': '💬 Signaler un problème ou proposer une idée',
+  'settings.feedbackButton': 'Signaler un problème ou proposer une idée',
   'settings.privacyTitle': 'Confidentialité',
   'settings.privacyText':
     "Seules les personnes que tu acceptes comme amis voient ta liste. Ta pièce d'identité est stockée chiffrée et n'est montrée à personne.",
@@ -316,8 +316,8 @@ export const fr: Dict = {
   'feedback.thanks': 'Merci !',
   'feedback.thanksText': "Nous l'avons bien reçu. Si besoin, quelqu'un t'appellera.",
   'feedback.title': 'Raconte-nous',
-  'feedback.bug': '🐞 Quelque chose ne va pas',
-  'feedback.idea': '💡 Une idée',
+  'feedback.bug': 'Quelque chose ne va pas',
+  'feedback.idea': 'Une idée',
   'feedback.bugLabel': "Qu'est-ce qui s'est passé ?",
   'feedback.ideaLabel': 'Que voudrais-tu ?',
   'feedback.bugPlaceholder':
@@ -430,8 +430,8 @@ export const fr: Dict = {
   'admin.enable': 'Réactiver',
   'admin.confirmDeleteUser':
     'Supprimer le compte de {name} ? Ses cadeaux disparaissent aussi et rien ne peut être annulé.',
-  'admin.bug': '🐞 Panne',
-  'admin.idea': '💡 Idée',
+  'admin.bug': 'Panne',
+  'admin.idea': 'Idée',
   'admin.done': 'Résolu',
   'admin.deletedAccount': 'Compte supprimé',
   'admin.markPending': 'Remettre en attente',

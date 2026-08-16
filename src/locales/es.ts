@@ -62,7 +62,7 @@ export const es = {
   'auth.reset.doneText': 'Ya puedes entrar con la nueva.',
   'auth.reset.goLogin': 'Ir a entrar',
 
-  'home.hello': 'Hola, {name} 👋',
+  'home.hello': 'Hola, {name}',
   'home.sub': 'Elige a quién quieres regalar algo.',
   'home.news': 'Novedades',
   'home.markRead': 'Marcar como leídas',
@@ -154,7 +154,7 @@ export const es = {
     'Si pulsas un corazón, {name} lo verá: sirve para decirle que te gusta lo que ha pedido.',
   'friendList.nudgeText': 'A {name} le faltan ideas apuntadas. Puedes pedirle que añada más.',
   'friendList.nudgeButton': 'Pedirle que apunte algo',
-  'friendList.nudgeSent': 'Aviso enviado ✅',
+  'friendList.nudgeSent': 'Aviso enviado',
   'friendList.birthdayToday': ' · ¡es hoy!',
   'friendList.birthdayTomorrow': ' · ¡mañana!',
   'friendList.birthdayIn': ' · faltan {n} días',
@@ -236,7 +236,7 @@ export const es = {
   'friends.confirmRemove': '¿Quitar a {name} de tus amigos?',
   'friends.emptyTitle': 'Aún no tienes amigos',
   'friends.emptyHint': 'Búscalos arriba por su nombre de usuario.',
-  'friends.fromContacts': '📇 Buscar en mis contactos',
+  'friends.fromContacts': 'Buscar en mis contactos',
   'friends.fromContactsNone': 'De los contactos que has elegido, ninguno está en Cample todavía.',
   'friends.inContacts': 'Está en tus contactos',
   'friends.contactsError': 'No se ha podido abrir la agenda',
@@ -298,7 +298,7 @@ export const es = {
   'settings.feedbackTitle': '¿Algo va mal o se te ocurre algo?',
   'settings.feedbackText':
     'Cuéntanoslo y lo leeremos. Sirve tanto para fallos («no me deja poner la foto») como para ideas nuevas.',
-  'settings.feedbackButton': '💬 Avisar de un fallo o proponer una idea',
+  'settings.feedbackButton': 'Avisar de un fallo o proponer una idea',
   'settings.privacyTitle': 'Privacidad',
   'settings.privacyText':
     'Tu lista solo la ven las personas que aceptas como amigos. Tu DNI se guarda cifrado y no se muestra a nadie.',
@@ -308,8 +308,8 @@ export const es = {
   'feedback.thanks': '¡Gracias!',
   'feedback.thanksText': 'Ya lo hemos recibido. Si hace falta, alguien te preguntará por teléfono.',
   'feedback.title': 'Cuéntanos',
-  'feedback.bug': '🐞 Algo va mal',
-  'feedback.idea': '💡 Una idea',
+  'feedback.bug': 'Algo va mal',
+  'feedback.idea': 'Una idea',
   'feedback.bugLabel': '¿Qué ha pasado?',
   'feedback.ideaLabel': '¿Qué te gustaría?',
   'feedback.bugPlaceholder':
@@ -420,8 +420,8 @@ export const es = {
   'admin.enable': 'Reactivar',
   'admin.confirmDeleteUser':
     '¿Borrar la cuenta de {name}? Se eliminan sus regalos y no se puede deshacer.',
-  'admin.bug': '🐞 Fallo',
-  'admin.idea': '💡 Idea',
+  'admin.bug': 'Fallo',
+  'admin.idea': 'Idea',
   'admin.done': 'Resuelto',
   'admin.deletedAccount': 'Cuenta borrada',
   'admin.markPending': 'Volver a pendiente',

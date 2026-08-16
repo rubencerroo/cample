@@ -304,7 +304,11 @@ export default function Settings() {
         >
           <div className="space-y-3">
             <p className="text-slate-600">{t('settings.feedbackText')}</p>
-            <button className="btn-primary w-full" onClick={() => setFeedback(true)}>
+            <button
+              className="btn-primary w-full inline-flex items-center justify-center gap-2"
+              onClick={() => setFeedback(true)}
+            >
+              <Icon icon={ICON.buzon} size={20} />
               {t('settings.feedbackButton')}
             </button>
           </div>
@@ -441,18 +445,19 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
             <div className="grid grid-cols-2 gap-2">
               {(
                 [
-                  ['bug', t('feedback.bug')],
-                  ['idea', t('feedback.idea')],
+                  ['bug', t('feedback.bug'), ICON.fallo],
+                  ['idea', t('feedback.idea'), ICON.idea],
                 ] as const
-              ).map(([k, l]) => (
+              ).map(([k, l, ico]) => (
                 <button
                   key={k}
                   type="button"
                   onClick={() => setKind(k)}
-                  className={`rounded-2xl border py-3 font-semibold ${
+                  className={`flex items-center justify-center gap-2 rounded-2xl border py-3 font-semibold ${
                     kind === k ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-300 text-slate-600'
                   }`}
                 >
+                  <Icon icon={ico} size={20} />
                   {l}
                 </button>
               ))}

@@ -18,7 +18,9 @@
  */
 import { MorphIcon } from 'morphicons/react'
 import {
+  BookUser,
   Boxes,
+  Bug,
   Cake,
   Check,
   CircleHelp,
@@ -87,6 +89,8 @@ export const ICON = {
   idioma: Globe,
   ayuda: CircleHelp,
   buzon: MessageSquare,
+  fallo: Bug,
+  agenda: BookUser,
   privacidad: Lock,
   // Guía de bienvenida
   apuntar: NotebookPen,

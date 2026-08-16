@@ -229,7 +229,10 @@ function Toque({ user }: { user: { username: string; displayName: string } }) {
         {t('friendList.nudgeText', { name: user.displayName.split(' ')[0] })}
       </p>
       {estado === 'enviado' ? (
-        <span className="chip bg-green-100 text-green-700">{t('friendList.nudgeSent')}</span>
+        <span className="chip inline-flex items-center gap-1 bg-green-100 text-green-700">
+          <Icon icon={ICON.check} size={14} />
+          {t('friendList.nudgeSent')}
+        </span>
       ) : (
         <button
           className="btn-ghost !py-2 !px-4 !text-sm"

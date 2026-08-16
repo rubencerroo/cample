@@ -3,6 +3,7 @@ import { api } from '../api'
 import { useAuth } from '../App'
 import { Empty, ErrorBox, Spinner, useAsync, useDialogos } from '../ui'
 import { localeOf, useT } from '../i18n'
+import { ICON, Icon } from '../icons'
 
 export default function Admin() {
   const { user } = useAuth()
@@ -65,7 +66,8 @@ function Buzon() {
           {list.data.feedback.map((f) => (
             <li key={f.id} className={`card space-y-2 ${f.status === 'done' ? 'opacity-60' : ''}`}>
               <div className="flex flex-wrap items-center gap-2">
-                <span className={`chip ${f.kind === 'bug' ? 'bg-red-100 text-red-700' : 'bg-brand-100 text-brand-700'}`}>
+                <span className={`chip inline-flex items-center gap-1 ${f.kind === 'bug' ? 'bg-red-100 text-red-700' : 'bg-brand-100 text-brand-700'}`}>
+                  <Icon icon={f.kind === 'bug' ? ICON.fallo : ICON.idea} size={14} />
                   {f.kind === 'bug' ? t('admin.bug') : t('admin.idea')}
                 </span>
                 {f.status === 'done' && (

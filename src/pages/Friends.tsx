@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api, User } from '../api'
 import { Avatar, Empty, ErrorBox, Spinner, useAsync, useDialogos } from '../ui'
 import { useT } from '../i18n'
+import { ICON, Icon } from '../icons'
 
 export default function Friends() {
   const t = useT()
@@ -188,7 +189,12 @@ function DesdeLaAgenda({ onAdd }: { onAdd: (username: string) => void }) {
 
   return (
     <section className="space-y-2">
-      <button className="btn-ghost w-full" onClick={abrir} disabled={busy}>
+      <button
+        className="btn-ghost w-full inline-flex items-center justify-center gap-2"
+        onClick={abrir}
+        disabled={busy}
+      >
+        <Icon icon={ICON.agenda} size={20} />
         {t('friends.fromContacts')}
       </button>
       <ErrorBox>{error}</ErrorBox>
