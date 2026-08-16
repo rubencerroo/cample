@@ -40,8 +40,6 @@ export const en: Dict = {
   'auth.username': 'Username',
   'auth.usernamePlaceholder': 'e.g. grandpa.frank',
   'auth.password': 'Password',
-  'auth.document': 'ID number (DNI or NIE)',
-  'auth.documentHint': 'It is only used to check it is really you. It is never stored as such and nobody sees it.',
   'auth.invitedBy': '{nombre} invited you. As soon as you sign up you will be friends.',
   'auth.phone': 'Phone (optional)',
   'auth.phoneHint': 'It lets your family find you from their contacts. Nobody sees your number.',
@@ -50,8 +48,6 @@ export const en: Dict = {
   'auth.reset.intro':
     'Ask for it here and tell whoever looks after Cample in your family. They will give you a code to set a new password.',
   'auth.reset.username': 'Your username',
-  'auth.reset.document': 'Your ID number',
-  'auth.reset.documentHint': 'Only if you gave it when you signed up. Otherwise leave it empty.',
   'auth.reset.sent':
     'Request sent. When they give you the code, type it here along with your new password.',
   'auth.reset.code': 'Code',

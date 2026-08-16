@@ -41,8 +41,6 @@ export const es = {
   'auth.username': 'Nombre de usuario',
   'auth.usernamePlaceholder': 'p. ej. abuelo.paco',
   'auth.password': 'Contraseña',
-  'auth.document': 'DNI o NIE',
-  'auth.documentHint': 'Sirve para verificar que eres tú. No se guarda tal cual ni lo ve nadie.',
   'auth.invitedBy': 'Te invita {nombre}. Al crear tu cuenta ya seréis amigos.',
   'auth.phone': 'Teléfono (opcional)',
   'auth.phoneHint': 'Sirve para que tu familia te encuentre desde su agenda. Nadie ve tu número.',
@@ -51,8 +49,6 @@ export const es = {
   'auth.reset.intro':
     'Pídelo aquí y avisa a la persona que administra Cample en tu familia. Ella te dará un código para poner una contraseña nueva.',
   'auth.reset.username': 'Tu nombre de usuario',
-  'auth.reset.document': 'Tu DNI o NIE',
-  'auth.reset.documentHint': 'Solo si lo pusiste al crear la cuenta. Si no, déjalo en blanco.',
   'auth.reset.sent':
     'Solicitud enviada. Cuando te den el código, escríbelo aquí junto con la contraseña nueva.',
   'auth.reset.code': 'Código',

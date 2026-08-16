@@ -40,9 +40,6 @@ export const fr: Dict = {
   'auth.username': "Nom d'utilisateur",
   'auth.usernamePlaceholder': 'p. ex. papy.paco',
   'auth.password': 'Mot de passe',
-  'auth.document': "Pièce d'identité (DNI ou NIE)",
-  'auth.documentHint':
-    "Cela sert uniquement à vérifier que c'est bien toi. Ce numéro n'est jamais conservé tel quel et personne ne le voit.",
   'auth.invitedBy': "{nombre} t'invite. Dès que tu crées ton compte, vous serez amis.",
   'auth.phone': 'Téléphone (facultatif)',
   'auth.phoneHint':
@@ -52,9 +49,6 @@ export const fr: Dict = {
   'auth.reset.intro':
     "Fais-en la demande ici et préviens la personne qui s'occupe de Cample dans ta famille. Elle te donnera un code pour choisir un nouveau mot de passe.",
   'auth.reset.username': "Ton nom d'utilisateur",
-  'auth.reset.document': "Ton numéro de pièce d'identité",
-  'auth.reset.documentHint':
-    "Seulement si tu l'as indiqué en créant ton compte. Sinon, laisse vide.",
   'auth.reset.sent':
     "Demande envoyée. Quand on te donnera le code, saisis-le ici avec ton nouveau mot de passe.",
   'auth.reset.code': 'Code',

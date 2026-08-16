@@ -97,10 +97,15 @@ tercera vía pero **no está hecha**: sin envío real no hay nada que verificar.
 forma del ataque). **No bloquea nada y no se le dice nunca al usuario**; es solo una señal para
 mirar con calma.
 
-⚠️ El DNI sigue existiendo en `users.dni_hash` para las cuentas viejas (con índice único parcial) y
-se les sigue pidiendo al recuperar contraseña; las nuevas no lo tienen y ahí basta el usuario,
-porque quien decide de verdad es el admin que aprueba a mano. Bases anteriores necesitan
+⚠️ **Ya no queda ningún DNI en la base.** La columna `users.dni_hash` sigue existiendo (con índice
+único parcial) pero está a `NULL` en todas las filas: los hashes de las cuentas antiguas se borraron
+a mano el 16 de agosto de 2026, avisando a cada persona con una notificación. `trust_source='dni'`
+se conserva como constancia de por qué esas cuentas son de fiar. Bases anteriores necesitan
 `migrations/011_apertura.sql`, que además marca de fiar a todas las cuentas que ya existían.
+
+Como consecuencia, **recuperar la contraseña se pide solo con el nombre de usuario**: lo que decide
+es que un admin humano reconozca a quien la pide. `src/server/dni.ts` se queda sin usar, a propósito;
+no se borra por si algún día vuelve a hacer falta validar un documento.
 
 ## Enlace de invitación
 

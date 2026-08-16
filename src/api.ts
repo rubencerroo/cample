@@ -181,8 +181,8 @@ export const api = {
   login: (username: string, password: string) =>
     req<{ user: User }>('/auth/login', { method: 'POST', ...body({ username, password }) }),
   logout: () => req('/auth/logout', { method: 'POST' }),
-  requestReset: (username: string, document: string) =>
-    req<{ ok: true }>('/auth/reset/request', { method: 'POST', ...body({ username, document }) }),
+  requestReset: (username: string) =>
+    req<{ ok: true }>('/auth/reset/request', { method: 'POST', ...body({ username }) }),
   confirmReset: (username: string, code: string, password: string) =>
     req<{ ok: true }>('/auth/reset/confirm', { method: 'POST', ...body({ username, code, password }) }),
   adminResets: () => req<{ resets: Reset[] }>('/admin/resets'),

@@ -159,7 +159,7 @@ export default function Auth({ onAuth }: { onAuth: (u: User) => void }) {
 function Forgot({ onDone }: { onDone: () => void }) {
   const t = useT()
   const [step, setStep] = useState<'ask' | 'code'>('ask')
-  const [f, setF] = useState({ username: '', document: '', code: '', password: '' })
+  const [f, setF] = useState({ username: '', code: '', password: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
@@ -173,7 +173,7 @@ function Forgot({ onDone }: { onDone: () => void }) {
     setError('')
     try {
       if (step === 'ask') {
-        await api.requestReset(f.username, f.document)
+        await api.requestReset(f.username)
         setStep('code')
       } else {
         await api.confirmReset(f.username, f.code, f.password)
@@ -207,12 +207,6 @@ function Forgot({ onDone }: { onDone: () => void }) {
           <div>
             <label className="label" htmlFor="fu">{t('auth.reset.username')}</label>
             <input id="fu" className="input" value={f.username} onChange={set('username')} autoCapitalize="none" required />
-          </div>
-          {/* Solo lo tienen las cuentas antiguas; quien no lo puso lo deja en blanco. */}
-          <div>
-            <label className="label" htmlFor="fd">{t('auth.reset.document')}</label>
-            <input id="fd" className="input" value={f.document} onChange={set('document')} autoCapitalize="characters" />
-            <p className="mt-1.5 text-sm text-slate-500">{t('auth.reset.documentHint')}</p>
           </div>
         </>
       ) : (

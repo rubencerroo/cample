@@ -4,7 +4,6 @@ import { randomId, sha256, hmac, hashPassword, verifyPassword, timingSafeEqual }
 import { normalizePhone } from './phone'
 import { normalizeUrl, unfurl } from './unfurl'
 import { translateError } from './messages'
-import { normalizeDocument } from './dni'
 
 export type Env = {
   DB: D1Database
@@ -375,8 +374,9 @@ app.get('/me', async (c) => {
 })
 
 /* ------------------------ recuperar contraseña ---------------------------- */
-// No hay email en el sistema: la persona lo pide con su DNI, un administrador de la familia lo
-// aprueba y le dicta el código por teléfono. Así, conocer el DNI de alguien no basta para entrar.
+// No hay email en el sistema: la persona la pide con su usuario, un administrador la aprueba y le
+// dicta el código por teléfono. Lo que decide es que un humano reconozca a quien la pide, así que
+// pedir además un dato secreto no añadía gran cosa (y ya no queda ninguno: ver «Confianza»).
 
 // Sin caracteres ambiguos: se dicta en voz alta.
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -394,18 +394,12 @@ app.post('/auth/reset/request', async (c) => {
     return c.json({ error: 'Demasiados intentos, prueba dentro de un rato' }, 429)
 
   const b = await c.req.json().catch(() => ({}))
-  const doc = normalizeDocument(String(b.document ?? ''))
   const username = String(b.username ?? '').trim().toLowerCase()
 
   // Respuesta idéntica acierte o no: no confirmamos si una cuenta existe.
   if (username) {
-    // Las cuentas antiguas siguen teniendo DNI y se les sigue pidiendo. Las nuevas no tienen, así
-    // que basta el usuario: quien decide de verdad es el admin que lo aprueba a mano.
-    const u = await c.env.DB.prepare(
-      'SELECT id FROM users WHERE username = ? AND is_active = 1 ' +
-        'AND (dni_hash IS NULL OR dni_hash = ?)',
-    )
-      .bind(username, doc ? await hmac(c.env.DNI_PEPPER, doc) : '')
+    const u = await c.env.DB.prepare('SELECT id FROM users WHERE username = ? AND is_active = 1')
+      .bind(username)
       .first<{ id: string }>()
     if (u) {
       const pending = await c.env.DB.prepare(
