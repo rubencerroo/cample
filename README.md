@@ -4,6 +4,8 @@ Lista de regalos privada para familia y amigos. Cada persona apunta lo que le gu
 
 **En producción:** https://cample.pages.dev, en uso real por una familia.
 
+![Pantalla de entrada](docs/captura.png)
+
 ## Stack
 
 - **Frontend:** React 18, Vite, Tailwind v4 (PWA instalable)
